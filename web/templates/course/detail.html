@@ -4,29 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/nav.css">
     <link rel="stylesheet" href="/static/css/course.css">
 </head>
 <body>
     <header class="navbar">
         <a href="/courses" class="nav-brand">
-            <span>&#128187;</span>
+            <span class="brand-icon">&#128187;</span>
             <span>Web Python <strong>Platform</strong></span>
         </a>
         <nav class="nav-links">
-            <a href="/courses" class="active">Môn học</a>
-            <a href="/ide">Luyện tập (IDE)</a>
+            <a href="/dashboard">&#128202; Dashboard</a>
+            <a href="/courses" class="active">&#128218; Môn học</a>
+            <a href="/my-assignments">&#128221; Bài tập</a>
+            <a href="/student/exams">&#9201; Kiểm tra</a>
+            <a href="/ide" style="color: var(--nav-accent);">&#9658; Web IDE</a>
             {{ if .User }}
                 {{ if or (eq .User.Role "teacher") (eq .User.Role "admin") }}
-                <a href="/teacher/courses">Khu vực Giảng viên</a>
+                <a href="/teacher" style="color: var(--nav-accent-teacher);">&#127891; Quản lý Giảng viên</a>
                 {{ end }}
             {{ end }}
         </nav>
         <div class="nav-user">
             {{ if .User }}
-                <span>{{ .User.FullName }}</span>
+                <span class="user-name">{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
-                <form action="/logout" method="POST" style="display:inline;">
-                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
                 </form>
             {{ end }}
         </div>
@@ -48,16 +52,31 @@
             </div>
         </div>
 
-        <div class="form-card" style="max-width: 100%; margin-bottom: 24px;">
-            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Thông tin môn học</h3>
-            <p style="color: var(--text-muted); line-height: 1.6;">
-                Giảng viên phụ trách: <strong>{{ if .Course.TeacherName }}{{ .Course.TeacherName }}{{ else }}Bộ môn{{ end }}</strong><br>
-                Trạng thái: <span class="badge-status status-active">{{ .Course.Status }}</span><br>
-                Ngày tạo: {{ .Course.CreatedAt.Format "02/01/2006" }}
-            </p>
+        <!-- Course Navigation Tabs (Phase 18) -->
+        <div class="course-nav-bar">
+            <div class="course-nav-tabs">
+                <a href="#tab-overview" class="course-nav-tab active" onclick="switchCourseTab(event, 'tab-overview')">&#128203; Tổng quan</a>
+                <a href="#tab-curriculum" class="course-nav-tab" onclick="switchCourseTab(event, 'tab-curriculum')">&#128218; Nội dung</a>
+                <a href="#tab-assignments" class="course-nav-tab" onclick="switchCourseTab(event, 'tab-assignments')">&#128221; Bài tập</a>
+                <a href="#tab-exams" class="course-nav-tab" onclick="switchCourseTab(event, 'tab-exams')">&#9201; Kiểm tra</a>
+                <a href="#tab-grades" class="course-nav-tab" onclick="switchCourseTab(event, 'tab-grades')">&#128200; Điểm</a>
+            </div>
         </div>
 
-        <div>
+        <!-- Tab 1: Tổng quan -->
+        <div id="tab-overview" class="course-tab-pane active">
+            <div class="form-card" style="max-width: 100%; margin-bottom: 24px;">
+                <h3 style="color: var(--text-bright); margin-bottom: 12px;">Thông tin môn học</h3>
+                <p style="color: var(--text-muted); line-height: 1.6;">
+                    Giảng viên phụ trách: <strong>{{ if .Course.TeacherName }}{{ .Course.TeacherName }}{{ else }}Bộ môn{{ end }}</strong><br>
+                    Trạng thái: <span class="badge-status status-active">{{ .Course.Status }}</span><br>
+                    Ngày tạo: {{ .Course.CreatedAt.Format "02/01/2006" }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Tab 2: Nội dung & Chương trình học -->
+        <div id="tab-curriculum" class="course-tab-pane">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h2 style="color: var(--text-bright); font-size: 20px;">Chương trình đào tạo</h2>
                 {{ if .User }}
@@ -96,6 +115,55 @@
             </div>
             {{ end }}
         </div>
+
+        <!-- Tab 3: Bài tập -->
+        <div id="tab-assignments" class="course-tab-pane">
+            <div class="form-card" style="max-width: 100%;">
+                <h3 style="color: var(--text-bright); margin-bottom: 8px;">Danh sách bài tập môn học</h3>
+                <p style="color: var(--text-muted); font-size: 14px;">Các đợt bài tập được giao cho các lớp học phần thuộc môn này.</p>
+                <div style="margin-top: 16px;">
+                    <a href="/my-assignments" class="btn btn-primary" style="font-size: 13px;">Xem bài tập của tôi &rarr;</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Kiểm tra -->
+        <div id="tab-exams" class="course-tab-pane">
+            <div class="form-card" style="max-width: 100%;">
+                <h3 style="color: var(--text-bright); margin-bottom: 8px;">Kỳ thi & Kiểm tra trực tuyến</h3>
+                <p style="color: var(--text-muted); font-size: 14px;">Tham gia các đợt kiểm tra trực tuyến có giám sát và giới hạn thời gian.</p>
+                <div style="margin-top: 16px;">
+                    <a href="/student/exams" class="btn btn-primary" style="font-size: 13px;">Xem lịch thi của tôi &rarr;</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Điểm -->
+        <div id="tab-grades" class="course-tab-pane">
+            <div class="form-card" style="max-width: 100%;">
+                <h3 style="color: var(--text-bright); margin-bottom: 8px;">Bảng điểm & Tiến độ hoàn thành</h3>
+                <p style="color: var(--text-muted); font-size: 14px;">Theo dõi tiến trình giải bài tập và điểm số tích lũy của bạn trong học phần.</p>
+                <div style="margin-top: 16px;">
+                    <a href="/dashboard" class="btn btn-primary" style="font-size: 13px;">Xem chi tiết tại Dashboard &rarr;</a>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <script>
+        function switchCourseTab(event, targetId) {
+            if (event) event.preventDefault();
+            document.querySelectorAll('.course-nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.course-tab-pane').forEach(pane => pane.classList.remove('active'));
+            
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('active');
+            }
+            const targetPane = document.getElementById(targetId);
+            if (targetPane) {
+                targetPane.classList.add('active');
+            }
+        }
+    </script>
 </body>
 </html>

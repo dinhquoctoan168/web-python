@@ -1,0 +1,25 @@
+{{ define "nav_student" }}
+<header class="navbar">
+    <a href="/dashboard" class="nav-brand">
+        <span class="brand-icon">&#128187;</span>
+        <span>Web Python <strong>Platform</strong></span>
+    </a>
+    <nav class="nav-links">
+        <a href="/dashboard" class="{{ if eq .ActiveNav "dashboard" }}active{{ end }}">&#128202; Dashboard</a>
+        <a href="/courses" class="{{ if eq .ActiveNav "courses" }}active{{ end }}">&#128218; Môn học</a>
+        <a href="/my-assignments" class="{{ if eq .ActiveNav "assignments" }}active{{ end }}">&#128221; Bài tập</a>
+        <a href="/student/exams" class="{{ if eq .ActiveNav "exams" }}active{{ end }}">&#9201; Kiểm tra</a>
+        <a href="/dashboard#submissions" class="{{ if eq .ActiveNav "submissions" }}active{{ end }}">&#128203; Kết quả</a>
+        <a href="/ide" class="{{ if eq .ActiveNav "ide" }}active{{ end }}" style="color: var(--nav-accent);">&#9658; Web IDE</a>
+    </nav>
+    <div class="nav-user">
+        {{ if .User }}
+            <span class="user-name">{{ .User.FullName }}</span>
+            <span class="badge-role">{{ .User.Role }}</span>
+            <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
+            </form>
+        {{ end }}
+    </div>
+</header>
+{{ end }}

@@ -1,0 +1,261 @@
+/* ==========================================================================
+   UNIFIED NAVIGATION & RESPONSIVE LAYOUT (Phase 18 — UI/UX Restructure)
+   Áp dụng đồng bộ cho: Student Nav, Teacher Nav, Course Nav, Responsive Breakpoints
+   ========================================================================== */
+
+:root {
+    --nav-height: 56px;
+    --nav-bg: #181825;
+    --nav-border: #313244;
+    --nav-text: #a6adc8;
+    --nav-text-active: #ffffff;
+    --nav-accent: #89b4fa;
+    --nav-accent-teacher: #cba6f7;
+    --nav-role-bg: rgba(137, 180, 250, 0.15);
+}
+
+/* ==========================================================================
+   1. GLOBAL NAVBAR (Header)
+   ========================================================================== */
+.navbar {
+    background-color: var(--nav-bg);
+    border-bottom: 1px solid var(--nav-border);
+    padding: 0 24px;
+    height: var(--nav-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--nav-text-active);
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.nav-brand .brand-icon {
+    font-size: 20px;
+}
+
+.nav-brand strong {
+    color: var(--nav-accent);
+}
+
+.nav-brand.teacher strong {
+    color: var(--nav-accent-teacher);
+}
+
+/* Danh sách liên kết điều hướng chính */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 16px;
+    overflow-x: auto;
+    scrollbar-width: none; /* Firefox */
+}
+
+.nav-links::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
+}
+
+.nav-links a {
+    color: var(--nav-text);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-links a:hover {
+    color: var(--nav-text-active);
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.nav-links a.active {
+    color: var(--nav-text-active);
+    background-color: rgba(137, 180, 250, 0.12);
+    border-bottom: 2px solid var(--nav-accent);
+}
+
+.navbar.teacher .nav-links a.active {
+    background-color: rgba(203, 166, 247, 0.12);
+    border-bottom: 2px solid var(--nav-accent-teacher);
+}
+
+/* Thông tin người dùng góc phải */
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--nav-text-active);
+    white-space: nowrap;
+}
+
+.nav-user .user-name {
+    font-weight: 500;
+}
+
+.badge-role {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--nav-role-bg);
+    color: var(--nav-accent);
+    letter-spacing: 0.5px;
+}
+
+.badge-role.teacher {
+    background: rgba(203, 166, 247, 0.15);
+    color: var(--nav-accent-teacher);
+}
+
+.badge-role.admin {
+    background: rgba(243, 139, 168, 0.15);
+    color: #f38ba8;
+}
+
+/* ==========================================================================
+   2. COURSE NAVIGATION TABS (5 mục theo Roadmap Phase 18)
+   ========================================================================== */
+.course-nav-bar {
+    background: #1e1e2e;
+    border-bottom: 1px solid var(--nav-border);
+    margin-bottom: 24px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.course-nav-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.course-nav-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.course-nav-tab {
+    padding: 10px 18px;
+    color: var(--nav-text);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.course-nav-tab:hover {
+    color: var(--nav-text-active);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.course-nav-tab.active {
+    color: var(--nav-text-active);
+    background-color: rgba(137, 180, 250, 0.15);
+    font-weight: 600;
+    border-bottom: 2px solid var(--nav-accent);
+}
+
+/* Các tab pane tương ứng */
+.course-tab-pane {
+    display: none;
+}
+
+.course-tab-pane.active {
+    display: block;
+    animation: fadeInTab 0.2s ease-in-out;
+}
+
+@keyframes fadeInTab {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   3. RESPONSIVE BREAKPOINTS (Desktop, Laptop, Tablet, Mobile)
+   ========================================================================== */
+
+/* Laptop (1024px - 1199px) */
+@media (max-width: 1199px) {
+    .container {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    .nav-links a {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}
+
+/* Tablet (768px - 1023px) */
+@media (max-width: 1023px) {
+    .navbar {
+        padding: 0 16px;
+    }
+    .nav-links {
+        margin: 0 8px;
+        gap: 4px;
+    }
+    .nav-user .user-name {
+        display: none; /* Thu gọn tên trên tablet */
+    }
+}
+
+/* Mobile (< 768px) */
+@media (max-width: 767px) {
+    .navbar {
+        flex-direction: column;
+        height: auto;
+        padding: 10px 14px;
+        gap: 10px;
+    }
+    .nav-brand {
+        align-self: flex-start;
+    }
+    .nav-links {
+        width: 100%;
+        margin: 0;
+        justify-content: flex-start;
+        padding-bottom: 4px;
+    }
+    .nav-user {
+        align-self: flex-end;
+        width: 100%;
+        justify-content: space-between;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .course-nav-tabs {
+        padding: 4px;
+    }
+    .course-nav-tab {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+}

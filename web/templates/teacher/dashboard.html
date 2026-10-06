@@ -4,28 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/nav.css">
     <link rel="stylesheet" href="/static/css/teacher.css">
 </head>
 <body>
-    <header class="navbar">
-        <a href="/teacher" class="nav-brand">
-            <span>&#127891;</span>
-            <span>Teacher <strong>Dashboard</strong></span>
+    <header class="navbar teacher">
+        <a href="/teacher" class="nav-brand teacher">
+            <span class="brand-icon">&#127891;</span>
+            <span>Teacher <strong>Platform</strong></span>
         </a>
         <nav class="nav-links">
-            <a href="/teacher" class="active">Tổng quan</a>
-            <a href="/teacher/courses">Môn học</a>
-            <a href="/teacher/classes">Lớp học</a>
-            <a href="/teacher/submissions">Bài nộp</a>
-            <a href="/teacher/exam/monitoring">Giám sát thi</a>
-            <a href="/courses">Xem trang học viên</a>
+            <a href="/teacher" class="active">&#128202; Dashboard</a>
+            <a href="/teacher/courses">&#128218; Môn học</a>
+            <a href="/teacher/classes">&#127891; Lớp học</a>
+            <a href="/teacher/curriculum">&#128214; Nội dung</a>
+            <a href="/ide">&#128187; Ngân hàng bài tập</a>
+            <a href="/teacher/assignments">&#128221; Bài tập</a>
+            <a href="/teacher/exam/monitoring">&#9201; Kiểm tra</a>
+            <a href="/teacher/classes">&#128101; Sinh viên</a>
+            <a href="/teacher" class="active">&#128200; Thống kê</a>
         </nav>
         <div class="nav-user">
             {{ if .User }}
-                <span>{{ .User.FullName }}</span>
-                <span class="badge-role">{{ .User.Role }}</span>
-                <form action="/logout" method="POST" style="display:inline;">
-                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                <span class="user-name">{{ .User.FullName }}</span>
+                <span class="badge-role teacher">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
                 </form>
             {{ end }}
         </div>
