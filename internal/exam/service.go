@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"web_python/internal/audit"
 	"web_python/internal/judge"
 )
 
@@ -17,6 +18,7 @@ var (
 type Service struct {
 	repo         *Repository
 	judgeService *judge.Service
+	auditService *audit.Service
 }
 
 func NewService(repo *Repository, js *judge.Service) *Service {
@@ -24,6 +26,10 @@ func NewService(repo *Repository, js *judge.Service) *Service {
 		repo:         repo,
 		judgeService: js,
 	}
+}
+
+func (s *Service) SetAuditService(as *audit.Service) {
+	s.auditService = as
 }
 
 // CreateExam tạo mới đề thi cho lớp học
@@ -66,7 +72,17 @@ func (s *Service) CreateExam(teacherID, classID int, title, description string, 
 		}
 	}
 
-	return s.repo.CreateExam(e, exerciseIDs, points)
+	created, err := s.repo.CreateExam(e, exerciseIDs, points)
+	if err != nil {
+		return nil, err
+	}
+	if s.auditService != nil && created != nil {
+		_ = s.auditService.LogAction(&teacherID, "create_exam", "exam", &created.ID, map[string]any{
+			"title":    created.Title,
+			"class_id": created.ClassID,
+		})
+	}
+	return created, nil
 }
 
 // GetExam lấy chi tiết bài thi
@@ -105,7 +121,15 @@ func (s *Service) PublishExam(id int) error {
 	if id <= 0 {
 		return ErrExamNotFound
 	}
-	return s.repo.Publish(id)
+	if err := s.repo.Publish(id); err != nil {
+		return err
+	}
+	if s.auditService != nil {
+		_ = s.auditService.LogAction(nil, "publish_exam", "exam", &id, map[string]any{
+			"status": StatusPublished,
+		})
+	}
+	return nil
 }
 
 // StartOrResumeSession bắt đầu hoặc tiếp tục phiên thi của thí sinh

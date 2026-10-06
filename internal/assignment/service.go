@@ -4,14 +4,21 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"web_python/internal/audit"
 )
 
 type Service struct {
-	repo *Repository
+	repo         *Repository
+	auditService *audit.Service
 }
 
 func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
+}
+
+func (s *Service) SetAuditService(as *audit.Service) {
+	s.auditService = as
 }
 
 // CreateAssignment xử lý tạo mới bài tập cho lớp
@@ -52,7 +59,17 @@ func (s *Service) CreateAssignment(teacherID, classID int, title, description, s
 		}
 	}
 
-	return s.repo.CreateAssignment(a, exerciseIDs, points)
+	created, err := s.repo.CreateAssignment(a, exerciseIDs, points)
+	if err != nil {
+		return nil, err
+	}
+	if s.auditService != nil && created != nil {
+		_ = s.auditService.LogAction(&teacherID, "create_assignment", "assignment", &created.ID, map[string]any{
+			"title":    created.Title,
+			"class_id": created.ClassID,
+		})
+	}
+	return created, nil
 }
 
 // GetAssignment lấy chi tiết bài tập
@@ -91,5 +108,13 @@ func (s *Service) PublishAssignment(id int) error {
 	if id <= 0 {
 		return errors.New("ID bài tập không hợp lệ")
 	}
-	return s.repo.Publish(id)
+	if err := s.repo.Publish(id); err != nil {
+		return err
+	}
+	if s.auditService != nil {
+		_ = s.auditService.LogAction(nil, "publish_assignment", "assignment", &id, map[string]any{
+			"status": StatusPublished,
+		})
+	}
+	return nil
 }

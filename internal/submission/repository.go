@@ -242,3 +242,9 @@ func (r *Repository) GetStudentHistoryView(studentID, exerciseID int) (*StudentH
 
 	return view, nil
 }
+
+// UpdateScore cập nhật điểm số cho bài nộp
+func (r *Repository) UpdateScore(id int, newScore float64) error {
+	_, err := r.db.Exec("UPDATE submissions SET score = ? WHERE id = ?", newScore, id)
+	return err
+}

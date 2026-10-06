@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+
+	"web_python/internal/audit"
 )
 
 // Handler xử lý các yêu cầu HTTP liên quan đến Authentication
@@ -58,6 +60,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	user, session, err := h.service.Authenticate(username, password)
 	if err != nil {
+		audit.LogLoginFailure(username, r.RemoteAddr, err.Error())
 		h.renderLoginTemplate(w, err.Error())
 		return
 	}

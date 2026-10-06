@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"web_python/internal/assignment"
+	"web_python/internal/audit"
 	"web_python/internal/auth"
 	"web_python/internal/class"
 	"web_python/internal/course"
@@ -144,6 +145,13 @@ func main() {
 	progressService := progress.NewService(progressRepo)
 	progressHandler := progress.NewHandler(progressService)
 
+	auditRepo := audit.NewRepository(db)
+	auditService := audit.NewService(auditRepo)
+	classService.SetAuditService(auditService)
+	assignmentService.SetAuditService(auditService)
+	examService.SetAuditService(auditService)
+	submissionService.SetAuditService(auditService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -256,9 +264,9 @@ func main() {
 	mux.HandleFunc("/api/progress/chapter", auth.RequireLogin(progressHandler.HandleGetChapterProgress))
 	mux.HandleFunc("/api/progress/lesson", auth.RequireLogin(progressHandler.HandleGetLessonProgress))
 
-	// Bọc toàn bộ handler với CSRFMiddleware và AuthenticateMiddleware (Phase 19)
+	// Bọc toàn bộ handler với CSRFMiddleware, AuthenticateMiddleware và RequestLoggerMiddleware (Phase 19 & 20)
 	csrfMiddleware := security.CSRFMiddleware("/login", "/logout")
-	rootHandler := authMiddleware.AuthenticateMiddleware(csrfMiddleware(mux))
+	rootHandler := audit.RequestLoggerMiddleware(authMiddleware.AuthenticateMiddleware(csrfMiddleware(mux)))
 
 	server := &http.Server{
 		Addr:         ":" + port,

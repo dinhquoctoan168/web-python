@@ -3,6 +3,8 @@ package class
 import (
 	"errors"
 	"strings"
+
+	"web_python/internal/audit"
 )
 
 var (
@@ -12,12 +14,18 @@ var (
 
 // Service cung cấp logic nghiệp vụ cho lớp học và ghi danh
 type Service struct {
-	repo *Repository
+	repo         *Repository
+	auditService *audit.Service
 }
 
 // NewService khởi tạo Service lớp học
 func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
+}
+
+// SetAuditService thiết lập service kiểm toán
+func (s *Service) SetAuditService(as *audit.Service) {
+	s.auditService = as
 }
 
 // ListClassesForTeacher lấy danh sách lớp học của giảng viên (hoặc tất cả nếu là admin)
@@ -109,7 +117,16 @@ func (s *Service) EnrollStudent(classID, studentID int) error {
 		return ErrAlreadyEnrolled
 	}
 
-	return s.repo.EnrollStudent(classID, studentID)
+	if err := s.repo.EnrollStudent(classID, studentID); err != nil {
+		return err
+	}
+
+	if s.auditService != nil {
+		_ = s.auditService.LogAction(nil, "enroll_student", "class", &classID, map[string]any{
+			"student_id": studentID,
+		})
+	}
+	return nil
 }
 
 // RemoveStudent huỷ ghi danh sinh viên khỏi lớp
@@ -117,7 +134,16 @@ func (s *Service) RemoveStudent(classID, studentID int) error {
 	if classID <= 0 || studentID <= 0 {
 		return errors.New("thông tin lớp học hoặc sinh viên không hợp lệ")
 	}
-	return s.repo.RemoveStudent(classID, studentID)
+	if err := s.repo.RemoveStudent(classID, studentID); err != nil {
+		return err
+	}
+
+	if s.auditService != nil {
+		_ = s.auditService.LogAction(nil, "delete_student", "class", &classID, map[string]any{
+			"student_id": studentID,
+		})
+	}
+	return nil
 }
 
 // VerifyTeacherOwnership kiểm tra giảng viên có quyền quản lý lớp học hay không (trừ admin)

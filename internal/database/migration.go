@@ -529,6 +529,24 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 14,
+		Name:    "audit_logs",
+		Up: func(tx *sql.Tx) error {
+			query := `CREATE TABLE IF NOT EXISTS audit_logs (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER,
+				action TEXT NOT NULL,
+				object_type TEXT NOT NULL,
+				object_id INTEGER,
+				metadata TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY(user_id) REFERENCES users(id)
+			);`
+			_, err := tx.Exec(query)
+			return err
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

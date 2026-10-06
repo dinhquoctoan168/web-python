@@ -116,3 +116,30 @@ func TestJudgeAndSubmitFlow(t *testing.T) {
 	}
 }
 
+func TestEditScoreWithAudit(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	svc := NewService(repo)
+
+	sub, err := svc.SubmitCode(1, 1, "def test(): return 10", 50.0, 1, 2)
+	if err != nil {
+		t.Fatalf("SubmitCode thất bại: %v", err)
+	}
+
+	teacherID := 99
+	newScore := 85.0
+	if err := svc.EditScore(teacherID, sub.ID, newScore); err != nil {
+		t.Fatalf("EditScore thất bại: %v", err)
+	}
+
+	updated, err := svc.GetSubmissionDetail(sub.ID)
+	if err != nil {
+		t.Fatalf("GetSubmissionDetail thất bại: %v", err)
+	}
+	if updated.Score != 85.0 {
+		t.Errorf("Kỳ vọng điểm được sửa thành 85.0, nhận %f", updated.Score)
+	}
+}
+

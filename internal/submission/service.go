@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 
+	"web_python/internal/audit"
 	"web_python/internal/judge"
 )
 
 type Service struct {
 	repo         *Repository
 	judgeService *judge.Service
+	auditService *audit.Service
 }
 
 func NewService(repo *Repository) *Service {
@@ -18,6 +20,10 @@ func NewService(repo *Repository) *Service {
 
 func (s *Service) SetJudgeService(js *judge.Service) {
 	s.judgeService = js
+}
+
+func (s *Service) SetAuditService(as *audit.Service) {
+	s.auditService = as
 }
 
 // JudgeAndSubmit chấm bài thông qua Server-Side Judge và lưu bản ghi nộp bài
@@ -36,6 +42,7 @@ func (s *Service) JudgeAndSubmit(studentID, exerciseID int, sourceCode string) (
 			SourceCode: sourceCode,
 		})
 		if err != nil {
+			audit.LogJudgeError(0, exerciseID, err)
 			return nil, nil, fmt.Errorf("lỗi chấm bài: %w", err)
 		}
 	} else {
@@ -59,6 +66,7 @@ func (s *Service) JudgeAndSubmit(studentID, exerciseID int, sourceCode string) (
 
 	createdSub, err := s.repo.CreateSubmission(sub)
 	if err != nil {
+		audit.LogSubmissionFailure(studentID, exerciseID, err.Error())
 		return nil, nil, err
 	}
 
@@ -100,7 +108,38 @@ func (s *Service) SubmitCode(studentID, exerciseID int, code string, score float
 		Status:      status,
 	}
 
-	return s.repo.CreateSubmission(sub)
+	created, err := s.repo.CreateSubmission(sub)
+	if err != nil {
+		audit.LogSubmissionFailure(studentID, exerciseID, err.Error())
+		return nil, err
+	}
+	return created, nil
+}
+
+// EditScore cho phép giảng viên chỉnh sửa điểm bài nộp và lưu audit log
+func (s *Service) EditScore(teacherID, submissionID int, newScore float64) error {
+	if submissionID <= 0 {
+		return errors.New("bài nộp không hợp lệ")
+	}
+	sub, err := s.repo.GetSubmissionByID(submissionID)
+	if err != nil {
+		return err
+	}
+	if sub == nil {
+		return errors.New("không tìm thấy bài nộp")
+	}
+	oldScore := sub.Score
+	if err := s.repo.UpdateScore(submissionID, newScore); err != nil {
+		return err
+	}
+	if s.auditService != nil {
+		_ = s.auditService.LogAction(&teacherID, "edit_score", "submission", &submissionID, map[string]any{
+			"student_id": sub.StudentID,
+			"old_score":  oldScore,
+			"new_score":  newScore,
+		})
+	}
+	return nil
 }
 
 // GetMySubmissions lấy danh sách bài nộp của học viên
