@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }).catch(err => console.error('Lỗi ghi nhận action metric:', err));
     }
 
-    // Lưu bản ghi lịch sử nộp bài chính thức - Phase 8: Submissions
+    // Lưu bản ghi lịch sử nộp bài chính thức & nhận kết quả Server-Side Judge (Phase 10)
     function createSubmission(exerciseId, code, score, passedTests, totalTests) {
         fetch('/api/submissions', {
             method: 'POST',
@@ -200,7 +200,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 passed_tests: passedTests,
                 total_tests: totalTests
             })
-        }).catch(err => console.error('Lỗi lưu submission:', err));
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.judge) {
+                console.log('[Server Judge] Điểm chính thức:', data.judge.score, 'Đạt:', data.judge.passed_tests + '/' + data.judge.total_tests);
+            }
+        })
+        .catch(err => console.error('Lỗi lưu submission:', err));
     }
 
     // Bộ phân tích cú pháp và tô màu mã Python (Python Syntax Highlighter)

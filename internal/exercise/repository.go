@@ -16,7 +16,7 @@ func NewRepository(db *sql.DB) *Repository {
 // FindByID tìm bài tập theo id kèm thông tin chi tiết
 func (r *Repository) FindByID(id int) (*Exercise, error) {
 	query := `SELECT e.id, e.course_id, e.lesson_id, e.topic_id, COALESCE(t.name, ''), e.title, 
-		e.exercise_type, e.difficulty, e.description, e.initial_code, COALESCE(e.solution_code, ''), 
+		e.exercise_type, e.difficulty, e.description, COALESCE(e.initial_code, ''), COALESCE(e.solution_code, ''), 
 		COALESCE(e.solution_hint, ''), COALESCE(e.allowed_functions, '[]'), e.time_limit_ms, 
 		e.status, e.created_by, e.created_at
 		FROM exercises e
@@ -92,7 +92,7 @@ func (r *Repository) FindTestCasesByExerciseID(exerciseID int, includeHidden boo
 // ListByCourseID lấy danh sách bài tập theo môn học
 func (r *Repository) ListByCourseID(courseID int) ([]Exercise, error) {
 	query := `SELECT id, course_id, lesson_id, topic_id, title, exercise_type, difficulty, 
-		description, initial_code, time_limit_ms, status, created_at 
+		description, COALESCE(initial_code, ''), time_limit_ms, status, created_at 
 		FROM exercises WHERE course_id = ? ORDER BY id ASC`
 	rows, err := r.db.Query(query, courseID)
 	if err != nil {
@@ -124,7 +124,7 @@ func (r *Repository) ListByCourseID(courseID int) ([]Exercise, error) {
 // ListByLessonID lấy danh sách bài tập theo bài học
 func (r *Repository) ListByLessonID(lessonID int) ([]Exercise, error) {
 	query := `SELECT id, course_id, lesson_id, topic_id, title, exercise_type, difficulty, 
-		description, initial_code, time_limit_ms, status, created_at 
+		description, COALESCE(initial_code, ''), time_limit_ms, status, created_at 
 		FROM exercises WHERE lesson_id = ? ORDER BY id ASC`
 	rows, err := r.db.Query(query, lessonID)
 	if err != nil {
@@ -156,7 +156,7 @@ func (r *Repository) ListByLessonID(lessonID int) ([]Exercise, error) {
 // ListAll lấy toàn bộ danh sách câu hỏi trong ngân hàng bài tập
 func (r *Repository) ListAll() ([]Exercise, error) {
 	query := `SELECT e.id, e.course_id, e.lesson_id, e.topic_id, COALESCE(t.name, ''), e.title, 
-		e.exercise_type, e.difficulty, e.description, e.initial_code, e.time_limit_ms, e.status, e.created_at 
+		e.exercise_type, e.difficulty, e.description, COALESCE(e.initial_code, ''), e.time_limit_ms, e.status, e.created_at 
 		FROM exercises e 
 		LEFT JOIN topics t ON e.topic_id = t.id 
 		ORDER BY e.course_id ASC, e.id ASC`

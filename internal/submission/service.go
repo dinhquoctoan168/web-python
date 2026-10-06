@@ -3,14 +3,66 @@ package submission
 import (
 	"errors"
 	"fmt"
+
+	"web_python/internal/judge"
 )
 
 type Service struct {
-	repo *Repository
+	repo         *Repository
+	judgeService *judge.Service
 }
 
 func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
+}
+
+func (s *Service) SetJudgeService(js *judge.Service) {
+	s.judgeService = js
+}
+
+// JudgeAndSubmit chấm bài thông qua Server-Side Judge và lưu bản ghi nộp bài
+func (s *Service) JudgeAndSubmit(studentID, exerciseID int, sourceCode string) (*Submission, *judge.JudgeResult, error) {
+	if studentID <= 0 || exerciseID <= 0 {
+		return nil, nil, errors.New("học viên hoặc bài tập không hợp lệ")
+	}
+
+	var judgeRes *judge.JudgeResult
+	var err error
+
+	if s.judgeService != nil {
+		judgeRes, err = s.judgeService.Evaluate(judge.JudgeRequest{
+			StudentID:  studentID,
+			ExerciseID: exerciseID,
+			SourceCode: sourceCode,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("lỗi chấm bài: %w", err)
+		}
+	} else {
+		judgeRes = &judge.JudgeResult{
+			Score:       0,
+			PassedTests: 0,
+			TotalTests:  0,
+			Status:      "fail",
+		}
+	}
+
+	sub := &Submission{
+		StudentID:   studentID,
+		ExerciseID:  exerciseID,
+		SourceCode:  sourceCode,
+		Score:       judgeRes.Score,
+		PassedTests: judgeRes.PassedTests,
+		TotalTests:  judgeRes.TotalTests,
+		Status:      judgeRes.Status,
+	}
+
+	createdSub, err := s.repo.CreateSubmission(sub)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return createdSub, judgeRes, nil
 }
 
 // RecordAction ghi nhận hành vi học tập (run, test, hint)

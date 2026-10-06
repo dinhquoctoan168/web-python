@@ -65,6 +65,22 @@ func (h *Handler) HandleCreateSubmission(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Nếu backend có Judge Service: chấm bằng Server-Side Judge chính thức (Phase 10)
+	if h.service.judgeService != nil {
+		sub, judgeRes, err := h.service.JudgeAndSubmit(user.ID, req.ExerciseID, req.SourceCode)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		json.NewEncoder(w).Encode(map[string]any{
+			"submission": sub,
+			"judge":      judgeRes,
+		})
+		return
+	}
+
 	sub, err := h.service.SubmitCode(user.ID, req.ExerciseID, req.SourceCode, req.Score, req.PassedTests, req.TotalTests)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

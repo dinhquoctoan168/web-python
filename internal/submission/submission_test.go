@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"web_python/internal/database"
+	"web_python/internal/exercise"
+	"web_python/internal/judge"
 
 	_ "modernc.org/sqlite"
 )
@@ -84,3 +86,33 @@ func TestAttemptMetricsAndSubmissions(t *testing.T) {
 		t.Errorf("Kỳ vọng 2 bài nộp, nhận %d", len(history.Submissions))
 	}
 }
+
+func TestJudgeAndSubmitFlow(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Thêm test case cho bài tập 1
+	_, _ = db.Exec(`INSERT INTO exercise_test_cases (exercise_id, call_expression, expected_output, is_hidden, weight, order_num) 
+		VALUES (1, 'test()', '42', 0, 1.0, 1)`)
+
+	repo := NewRepository(db)
+	svc := NewService(repo)
+
+	exRepo := exercise.NewRepository(db)
+	exSvc := exercise.NewService(exRepo)
+	judgeSvc := judge.NewService(exSvc)
+	svc.SetJudgeService(judgeSvc)
+
+	sub, judgeRes, err := svc.JudgeAndSubmit(1, 1, "def test(): return 42")
+	if err != nil {
+		t.Fatalf("JudgeAndSubmit thất bại: %v", err)
+	}
+
+	if sub.Score != 100.0 || sub.Status != "pass" {
+		t.Errorf("Kỳ vọng submission pass với 100 điểm, nhận score=%f status=%s", sub.Score, sub.Status)
+	}
+	if judgeRes.PassedTests != 1 || judgeRes.TotalTests != 1 {
+		t.Errorf("Kỳ vọng 1/1 test pass, nhận %d/%d", judgeRes.PassedTests, judgeRes.TotalTests)
+	}
+}
+

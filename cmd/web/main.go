@@ -20,6 +20,7 @@ import (
 	"web_python/internal/database"
 	"web_python/internal/exercise"
 	"web_python/internal/frontend"
+	"web_python/internal/judge"
 	"web_python/internal/lesson"
 	"web_python/internal/practice"
 	"web_python/internal/submission"
@@ -107,6 +108,10 @@ func main() {
 
 	submissionRepo := submission.NewRepository(db)
 	submissionService := submission.NewService(submissionRepo)
+
+	judgeService := judge.NewService(exerciseService)
+	submissionService.SetJudgeService(judgeService)
+
 	submissionHandler := submission.NewHandler(submissionService)
 
 	assignmentRepo := assignment.NewRepository(db)
@@ -196,6 +201,7 @@ func main() {
 	mux.HandleFunc("/api/practice/all-states", practiceHandler.HandleGetAllStates)
 	mux.HandleFunc("/api/attempt/action", auth.RequireLogin(submissionHandler.HandleRecordAction))
 	mux.HandleFunc("/api/submissions", auth.RequireLogin(submissionHandler.HandleCreateSubmission))
+	mux.HandleFunc("/api/submission", auth.RequireLogin(submissionHandler.HandleCreateSubmission))
 	mux.HandleFunc("/api/submissions/my", auth.RequireLogin(submissionHandler.HandleGetMySubmissions))
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware
