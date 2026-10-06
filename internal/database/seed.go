@@ -289,3 +289,49 @@ func seedCourses(db *sql.DB) error {
 	return nil
 }
 
+// seedClasses nạp các lớp học mẫu và ghi danh sinh viên mẫu
+func seedClasses(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM classes").Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	var dsaCourseID int
+	if err := db.QueryRow("SELECT id FROM courses WHERE code = 'DSA301' LIMIT 1").Scan(&dsaCourseID); err != nil {
+		return nil // Chưa có môn DSA301
+	}
+
+	var teacherID int
+	_ = db.QueryRow("SELECT id FROM users WHERE role = 'teacher' LIMIT 1").Scan(&teacherID)
+
+	var studentID int
+	_ = db.QueryRow("SELECT id FROM users WHERE role = 'student' LIMIT 1").Scan(&studentID)
+
+	// Thêm 2 lớp mẫu
+	res1, err := db.Exec(`INSERT INTO classes (course_id, name, semester, academic_year, teacher_id, status)
+		VALUES (?, ?, ?, ?, ?, 'active')`,
+		dsaCourseID, "23CNTT1 - HK1 2026", "HK1", "2026-2027", teacherID)
+	if err != nil {
+		return err
+	}
+	class1ID, _ := res1.LastInsertId()
+
+	_, err = db.Exec(`INSERT INTO classes (course_id, name, semester, academic_year, teacher_id, status)
+		VALUES (?, ?, ?, ?, ?, 'active')`,
+		dsaCourseID, "23CNTT2 - HK1 2026", "HK1", "2026-2027", teacherID)
+	if err != nil {
+		return err
+	}
+
+	// Ghi danh sinh viên mẫu vào lớp 23CNTT1
+	if studentID > 0 && class1ID > 0 {
+		_, _ = db.Exec(`INSERT INTO enrollments (class_id, student_id) VALUES (?, ?)`, class1ID, studentID)
+	}
+
+	log.Println("Đã nạp thành công các lớp học mẫu: 23CNTT1 và 23CNTT2.")
+	return nil
+}
+

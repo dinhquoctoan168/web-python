@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses">Quản lý Môn</a>
+            <a href="/teacher/classes" class="active">Quản lý Lớp</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/teacher/classes" style="color: var(--accent-blue-hover); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách lớp học</a>
+        </div>
+
+        {{ if .Message }}
+        <div class="alert-box alert-success">
+            {{ .Message }}
+        </div>
+        {{ end }}
+
+        {{ if .Error }}
+        <div class="alert-box alert-danger">
+            {{ .Error }}
+        </div>
+        {{ end }}
+
+        <div class="page-header">
+            <div>
+                <div class="class-meta">
+                    <span class="course-code">{{ .Class.CourseCode }}</span>
+                    <span class="meta-badge">{{ .Class.Semester }}</span>
+                    <span class="meta-badge">{{ .Class.AcademicYear }}</span>
+                </div>
+                <h1 class="page-title">{{ .Class.Name }}</h1>
+                <p class="page-subtitle">Môn học: {{ .Class.CourseName }} | Giảng viên: {{ .Class.TeacherName }}</p>
+            </div>
+            <div>
+                <span style="font-size: 14px; color: var(--text-muted);">Sĩ số hiện tại: <strong>{{ len .Students }}</strong> sinh viên</span>
+            </div>
+        </div>
+
+        <!-- Form ghi danh sinh viên -->
+        <div class="form-card" style="max-width: 100%; margin-bottom: 24px;">
+            <h3 style="color: var(--text-bright); margin-bottom: 12px; font-size: 16px;">Ghi danh sinh viên vào lớp</h3>
+            <form action="/teacher/class/enroll" method="POST" class="inline-form">
+                <input type="hidden" name="class_id" value="{{ .Class.ID }}">
+                <input type="text" name="username" class="form-control" placeholder="Nhập tên đăng nhập sinh viên (ví dụ: student)" required style="max-width: 350px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 16px;">+ Thêm sinh viên</button>
+            </form>
+        </div>
+
+        <!-- Bảng danh sách sinh viên -->
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">STT</th>
+                        <th style="width: 160px;">Tên đăng nhập</th>
+                        <th>Họ và tên</th>
+                        <th>Email</th>
+                        <th style="width: 180px;">Thời gian ghi danh</th>
+                        <th style="width: 100px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range $idx, $s := .Students }}
+                    <tr>
+                        <td>{{ $idx }}</td>
+                        <td><strong>{{ $s.Username }}</strong></td>
+                        <td>{{ $s.FullName }}</td>
+                        <td>{{ if $s.Email }}{{ $s.Email }}{{ else }}-{{ end }}</td>
+                        <td>{{ $s.EnrolledAt.Format "02/01/2006 15:04" }}</td>
+                        <td>
+                            <form action="/teacher/class/remove-student" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sinh viên này khỏi lớp?');" style="display:inline;">
+                                <input type="hidden" name="class_id" value="{{ $.Class.ID }}">
+                                <input type="hidden" name="student_id" value="{{ $s.ID }}">
+                                <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; color: #ff8888;">Xóa</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                            Lớp học hiện chưa có sinh viên nào. Hãy nhập tên đăng nhập để ghi danh ở khung phía trên.
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"web_python/internal/auth"
+	"web_python/internal/class"
 	"web_python/internal/course"
 	"web_python/internal/database"
 	"web_python/internal/frontend"
@@ -83,6 +84,10 @@ func main() {
 	courseService := course.NewService(courseRepo)
 	courseHandler := course.NewHandler(courseService)
 
+	classRepo := class.NewRepository(db)
+	classService := class.NewService(classRepo)
+	classHandler := class.NewHandler(classService, courseService)
+
 	// 4. Thiết lập Mux định tuyến thuần standard library
 	mux := http.NewServeMux()
 
@@ -104,13 +109,20 @@ func main() {
 	// Tuyến đường môn học (Sinh viên)
 	mux.HandleFunc("/courses", auth.RequireLogin(courseHandler.HandleListCourses))
 	mux.HandleFunc("/course", auth.RequireLogin(courseHandler.HandleCourseDetail))
+	mux.HandleFunc("/my-classes", auth.RequireLogin(classHandler.HandleStudentMyClasses))
 
-	// Tuyến đường quản lý môn học (Giảng viên)
+	// Tuyến đường quản lý môn học & lớp học (Giảng viên)
 	mux.HandleFunc("/teacher/courses", auth.RequireTeacher(courseHandler.HandleTeacherListCourses))
 	mux.HandleFunc("/teacher/course/new", auth.RequireTeacher(courseHandler.HandleTeacherNewCourseForm))
 	mux.HandleFunc("/teacher/course/create", auth.RequireTeacher(courseHandler.HandleTeacherCreateCourse))
 	mux.HandleFunc("/teacher/course/edit", auth.RequireTeacher(courseHandler.HandleTeacherEditCourseForm))
 	mux.HandleFunc("/teacher/course/update", auth.RequireTeacher(courseHandler.HandleTeacherUpdateCourse))
+
+	mux.HandleFunc("/teacher/classes", auth.RequireTeacher(classHandler.HandleTeacherListClasses))
+	mux.HandleFunc("/teacher/class", auth.RequireTeacher(classHandler.HandleTeacherClassDetail))
+	mux.HandleFunc("/teacher/class/create", auth.RequireTeacher(classHandler.HandleTeacherCreateClass))
+	mux.HandleFunc("/teacher/class/enroll", auth.RequireTeacher(classHandler.HandleTeacherEnrollStudent))
+	mux.HandleFunc("/teacher/class/remove-student", auth.RequireTeacher(classHandler.HandleTeacherRemoveStudent))
 
 	// Trang giao diện IDE (yêu cầu đăng nhập)
 	mux.HandleFunc("/ide", auth.RequireLogin(frontend.HandleIDE))

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/my-classes" class="active">Lớp học của tôi</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Lớp học của tôi</h1>
+                <p class="page-subtitle">Danh sách các lớp học phần bạn đã được ghi danh tham gia.</p>
+            </div>
+        </div>
+
+        <div class="class-grid">
+            {{ range .Classes }}
+            <div class="class-card">
+                <div>
+                    <div class="class-meta">
+                        <span class="course-code">{{ .CourseCode }}</span>
+                        <span class="meta-badge">{{ .Semester }}</span>
+                        <span class="meta-badge">{{ .AcademicYear }}</span>
+                    </div>
+                    <h2 class="course-title">{{ .Name }}</h2>
+                    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+                        Môn học: <strong>{{ .CourseName }}</strong><br>
+                        Giảng viên: <strong>{{ .TeacherName }}</strong>
+                    </p>
+                </div>
+                <div class="course-footer">
+                    <span>Sĩ số: {{ .StudentCount }} sinh viên</span>
+                    <a href="/course?id={{ .CourseID }}" class="btn btn-primary">Vào môn học &rarr;</a>
+                </div>
+            </div>
+            {{ else }}
+            <div class="form-card" style="max-width: 100%; text-align: center; color: var(--text-muted);">
+                Bạn hiện chưa được ghi danh vào lớp học nào. Hãy liên hệ giảng viên phụ trách để được thêm vào lớp.
+            </div>
+            {{ end }}
+        </div>
+    </main>
+</body>
+</html>

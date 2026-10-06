@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses">Quản lý Môn</a>
+            <a href="/teacher/classes" class="active">Quản lý Lớp</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Quản lý Lớp học</h1>
+                <p class="page-subtitle">Theo dõi danh sách các lớp học phần, sĩ số sinh viên và phân bổ đào tạo.</p>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; align-items: start;">
+            <!-- Danh sách lớp học -->
+            <div>
+                <div class="class-grid" style="grid-template-columns: 1fr;">
+                    {{ range .Classes }}
+                    <div class="class-card">
+                        <div>
+                            <div class="class-meta">
+                                <span class="course-code">{{ .CourseCode }}</span>
+                                <span class="meta-badge">{{ .Semester }}</span>
+                                <span class="meta-badge">{{ .AcademicYear }}</span>
+                            </div>
+                            <h2 class="course-title">{{ .Name }}</h2>
+                            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 12px;">
+                                Môn học: <strong>{{ .CourseName }}</strong>
+                            </p>
+                        </div>
+                        <div class="course-footer">
+                            <span>Sĩ số: <strong>{{ .StudentCount }}</strong> sinh viên</span>
+                            <a href="/teacher/class?id={{ .ID }}" class="btn btn-primary">Quản lý sinh viên &rarr;</a>
+                        </div>
+                    </div>
+                    {{ else }}
+                    <div class="form-card" style="max-width: 100%; text-align: center; color: var(--text-muted);">
+                        Chưa có lớp học nào. Hãy tạo lớp học mới ở khung bên cạnh.
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Form tạo lớp học mới -->
+            <div class="form-card" style="max-width: 100%;">
+                <h3 style="color: var(--text-bright); margin-bottom: 16px;">+ Mở lớp học mới</h3>
+                <form action="/teacher/class/create" method="POST">
+                    <div class="form-group">
+                        <label for="course_id">Môn học *</label>
+                        <select id="course_id" name="course_id" class="form-control" required>
+                            <option value="">-- Chọn môn học --</option>
+                            {{ range .Courses }}
+                            <option value="{{ .ID }}">{{ .Code }} - {{ .Name }}</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="name">Tên lớp học *</label>
+                        <input type="text" id="name" name="name" class="form-control" placeholder="Ví dụ: 23CNTT1 - HK1 2026" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="semester">Học kỳ</label>
+                        <input type="text" id="semester" name="semester" class="form-control" placeholder="Ví dụ: HK1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="academic_year">Năm học</label>
+                        <input type="text" id="academic_year" name="academic_year" class="form-control" placeholder="Ví dụ: 2026-2027">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px; margin-top: 8px;">Tạo lớp học</button>
+                </form>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
