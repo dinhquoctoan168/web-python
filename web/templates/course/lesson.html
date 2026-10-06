@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/lesson.css">
+    <!-- Skulpt Runtime -->
+    <script src="/static/js/skulpt.min.js"></script>
+    <script src="/static/js/skulpt-stdlib.js"></script>
+    <script src="/static/js/engine.js"></script>
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/course?id={{ .Lesson.CourseID }}">{{ .Lesson.CourseCode }}</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <div class="lesson-layout">
+        <!-- Sidebar cây chương mục -->
+        <aside class="curriculum-sidebar">
+            <div style="margin-bottom: 16px;">
+                <a href="/course?id={{ .Lesson.CourseID }}" style="color: var(--accent-blue-hover); text-decoration: none; font-size: 13px;">&larr; Chi tiết môn học</a>
+            </div>
+            <h3>Nội dung chương trình</h3>
+            {{ range .Curriculum.Chapters }}
+            <div class="chapter-group">
+                <div class="chapter-title">{{ .Title }}</div>
+                <div>
+                    {{ range .Lessons }}
+                    <a href="/lesson?id={{ .ID }}" class="lesson-item {{ if eq .ID $.Lesson.ID }}active{{ end }}">
+                        {{ .Title }}
+                    </a>
+                    {{ else }}
+                    <span style="font-size: 12px; color: var(--text-muted); padding-left: 10px;">Chưa có bài học</span>
+                    {{ end }}
+                </div>
+            </div>
+            {{ end }}
+        </aside>
+
+        <!-- Khung nội dung bài học -->
+        <main class="lesson-content-area">
+            <div style="margin-bottom: 24px;">
+                <span class="course-code" style="margin-bottom: 6px; display: inline-block;">{{ .Lesson.CourseCode }}</span>
+                <h1 style="color: var(--text-bright); font-size: 26px; margin-bottom: 8px;">{{ .Lesson.Title }}</h1>
+                <p style="color: var(--text-muted); font-size: 13px;">Thuộc: {{ .Lesson.ChapterTitle }}</p>
+            </div>
+
+            <!-- Bài giảng -->
+            <article class="lesson-article" id="lessonContent">
+                {{ .Lesson.SafeHTML }}
+            </article>
+
+            <!-- Trình chạy thử code ví dụ -->
+            <div class="runner-box">
+                <div class="runner-header">
+                    <strong style="color: var(--text-bright); font-size: 14px;">Trình chạy thử Python (Client-side Skulpt)</strong>
+                    <button id="btnRunExample" class="btn btn-success" style="padding: 6px 14px; font-size: 13px;">
+                        <span>&#9658;</span> Chạy thử (Run)
+                    </button>
+                </div>
+                <textarea id="exampleEditor" class="runner-editor" placeholder="Nhập mã Python hoặc sao chép từ bài học ở trên vào đây để chạy thử..."></textarea>
+                <div id="exampleConsole" class="runner-console">Console output sẽ xuất hiện tại đây sau khi nhấn "Chạy thử"...</div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                <a href="/course?id={{ .Lesson.CourseID }}" class="btn btn-secondary">&larr; Trở về môn học</a>
+                <a href="/ide" class="btn btn-primary">Luyện tập bài tập trên IDE &rarr;</a>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const editor = document.getElementById('exampleEditor');
+            const consoleBox = document.getElementById('exampleConsole');
+            const btnRun = document.getElementById('btnRunExample');
+
+            // Tự động tìm đoạn code đầu tiên trong bài học và nạp vào runner
+            const firstCodeBlock = document.querySelector('.lesson-article pre code');
+            if (firstCodeBlock) {
+                editor.value = firstCodeBlock.textContent.trim();
+            }
+
+            btnRun.addEventListener('click', () => {
+                const code = editor.value;
+                consoleBox.textContent = '';
+                
+                if (window.PythonEngine) {
+                    window.PythonEngine.runPython(
+                        code,
+                        (text) => { consoleBox.textContent += text; },
+                        (err) => { consoleBox.textContent += '\nLỗi thực thi: ' + err; },
+                        () => {}
+                    );
+                } else {
+                    consoleBox.textContent = 'Trình chạy PythonEngine chưa sẵn sàng.';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

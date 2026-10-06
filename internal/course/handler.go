@@ -12,12 +12,18 @@ import (
 
 // Handler quản lý các HTTP endpoints của môn học
 type Handler struct {
-	service *Service
+	service           *Service
+	curriculumFetcher func(courseID int, isTeacher bool) (any, error)
 }
 
 // NewHandler khởi tạo Handler môn học
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
+}
+
+// SetCurriculumFetcher cài đặt hàm lấy cấu trúc bài học cho môn học
+func (h *Handler) SetCurriculumFetcher(fn func(courseID int, isTeacher bool) (any, error)) {
+	h.curriculumFetcher = fn
 }
 
 // HandleListCourses hiển thị danh sách môn học cho sinh viên (GET /courses)
@@ -70,10 +76,18 @@ func (h *Handler) HandleCourseDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := auth.GetUser(r.Context())
+	isTeacher := user != nil && (user.Role == auth.RoleTeacher || user.Role == auth.RoleAdmin)
+
+	var curr any
+	if h.curriculumFetcher != nil {
+		curr, _ = h.curriculumFetcher(id, isTeacher)
+	}
+
 	h.renderTemplate(w, filepath.Join("web", "templates", "course", "detail.html"), map[string]any{
-		"Title":  c.Name + " (" + c.Code + ")",
-		"Course": c,
-		"User":   user,
+		"Title":      c.Name + " (" + c.Code + ")",
+		"Course":     c,
+		"Curriculum": curr,
+		"User":       user,
 	})
 }
 

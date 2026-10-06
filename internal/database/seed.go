@@ -335,3 +335,115 @@ func seedClasses(db *sql.DB) error {
 	return nil
 }
 
+// seedChaptersAndLessons nạp cấu trúc chương mục và bài học mẫu
+func seedChaptersAndLessons(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM chapters").Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	var pyCourseID, dsaCourseID int
+	_ = db.QueryRow("SELECT id FROM courses WHERE code = 'PY101' LIMIT 1").Scan(&pyCourseID)
+	_ = db.QueryRow("SELECT id FROM courses WHERE code = 'DSA301' LIMIT 1").Scan(&dsaCourseID)
+
+	// Seed cho PY101
+	if pyCourseID > 0 {
+		resChap1, err := db.Exec(`INSERT INTO chapters (course_id, title, description, order_num) 
+			VALUES (?, 'Chương 1: Nhập môn & Biến trong Python', 'Cú pháp cơ bản, biến, kiểu dữ liệu và rẽ nhánh', 1)`, pyCourseID)
+		if err == nil {
+			chap1ID, _ := resChap1.LastInsertId()
+			_, _ = db.Exec(`INSERT INTO lessons (chapter_id, title, content_html, order_num, is_published) VALUES (?, ?, ?, 1, 1)`,
+				chap1ID, "1.1 Cú pháp cơ bản và Khai báo biến",
+				`<p>Trong Python, biến không cần khai báo kiểu dữ liệu tường minh. Trình thông dịch sẽ tự động suy diễn kiểu dữ liệu dựa trên giá trị gán.</p>
+<h3>Quy tắc đặt tên biến</h3>
+<ul>
+  <li>Tên biến chỉ bao gồm chữ cái (a-z, A-Z), chữ số (0-9) và dấu gạch dưới (_).</li>
+  <li>Không bắt đầu bằng chữ số.</li>
+  <li>Phân biệt chữ hoa và chữ thường.</li>
+</ul>
+<h3>Code mẫu thực hành:</h3>
+<pre><code class="language-python"># Khai báo các biến cơ bản
+name = "Sinh viên"
+year_of_birth = 2004
+current_year = 2026
+age = current_year - year_of_birth
+
+print("Xin chào:", name)
+print("Tuổi hiện tại của bạn là:", age)
+</code></pre>`)
+
+			_, _ = db.Exec(`INSERT INTO lessons (chapter_id, title, content_html, order_num, is_published) VALUES (?, ?, ?, 2, 1)`,
+				chap1ID, "1.2 Cấu trúc rẽ nhánh if - elif - else",
+				`<p>Cấu trúc rẽ nhánh cho phép thực thi các khối lệnh khác nhau tùy thuộc vào điều kiện logic.</p>
+<pre><code class="language-python">score = 8.5
+
+if score >= 9.0:
+    grade = "Xuất sắc"
+elif score >= 8.0:
+    grade = "Giỏi"
+elif score >= 6.5:
+    grade = "Khá"
+else:
+    grade = "Trung bình"
+
+print("Điểm:", score)
+print("Xếp loại học tập:", grade)
+</code></pre>`)
+		}
+
+		resChap2, err := db.Exec(`INSERT INTO chapters (course_id, title, description, order_num) 
+			VALUES (?, 'Chương 2: Cấu trúc Dữ liệu Danh sách (List)', 'Các thao tác mảng động và duyệt phần tử', 2)`, pyCourseID)
+		if err == nil {
+			chap2ID, _ := resChap2.LastInsertId()
+			_, _ = db.Exec(`INSERT INTO lessons (chapter_id, title, content_html, order_num, is_published) VALUES (?, ?, ?, 1, 1)`,
+				chap2ID, "2.1 Các thao tác trên List",
+				`<p>List là cấu trúc dữ liệu lưu trữ tập hợp các phần tử có thứ tự và có thể thay đổi (mutable).</p>
+<pre><code class="language-python">fruits = ["Táo", "Cam", "Chuối"]
+fruits.append("Xoài")
+
+print("Danh sách trái cây:", fruits)
+print("Số lượng phần tử:", len(fruits))
+for item in fruits:
+    print("- Trái:", item)
+</code></pre>`)
+		}
+	}
+
+	// Seed cho DSA301
+	if dsaCourseID > 0 {
+		resChap, err := db.Exec(`INSERT INTO chapters (course_id, title, description, order_num) 
+			VALUES (?, 'Chương 1: Mảng và Giải thuật Tìm kiếm', 'Các giải thuật tìm kiếm trên mảng', 1)`, dsaCourseID)
+		if err == nil {
+			chapID, _ := resChap.LastInsertId()
+			_, _ = db.Exec(`INSERT INTO lessons (chapter_id, title, content_html, order_num, is_published) VALUES (?, ?, ?, 1, 1)`,
+				chapID, "1.1 Tìm kiếm nhị phân (Binary Search)",
+				`<p>Tìm kiếm nhị phân yêu cầu mảng đã được sắp xếp tăng dần, độ phức tạp thời gian đạt O(log N).</p>
+<pre><code class="language-python">def binary_search(arr, target):
+    left, right = 0, len(arr) - 1
+    while left <= right:
+        mid = (left + right) // 2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+    return -1
+
+numbers = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91]
+target = 23
+idx = binary_search(numbers, target)
+print(f"Mảng: {numbers}")
+print(f"Vị trí tìm thấy {target} là chỉ số: {idx}")
+</code></pre>`)
+		}
+	}
+
+	log.Println("Đã nạp thành công các chương mục và bài học mẫu.")
+	return nil
+}
+
+

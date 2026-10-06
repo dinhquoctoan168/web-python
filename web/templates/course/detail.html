@@ -48,16 +48,53 @@
             </div>
         </div>
 
-        <div class="form-card" style="max-width: 100%;">
+        <div class="form-card" style="max-width: 100%; margin-bottom: 24px;">
             <h3 style="color: var(--text-bright); margin-bottom: 12px;">Thông tin môn học</h3>
-            <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+            <p style="color: var(--text-muted); line-height: 1.6;">
                 Giảng viên phụ trách: <strong>{{ if .Course.TeacherName }}{{ .Course.TeacherName }}{{ else }}Bộ môn{{ end }}</strong><br>
                 Trạng thái: <span class="badge-status status-active">{{ .Course.Status }}</span><br>
                 Ngày tạo: {{ .Course.CreatedAt.Format "02/01/2006" }}
             </p>
-            <p style="color: var(--text-primary); font-size: 14px;">
-                Các bài học (Lessons) và lớp học (Classes) sẽ được đồng bộ và cập nhật trong các phase phát triển tiếp theo của hệ thống.
-            </p>
+        </div>
+
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="color: var(--text-bright); font-size: 20px;">Chương trình đào tạo</h2>
+                {{ if .User }}
+                    {{ if or (eq .User.Role "teacher") (eq .User.Role "admin") }}
+                    <a href="/teacher/curriculum?course_id={{ .Course.ID }}" class="btn btn-secondary" style="font-size: 13px;">Quản lý Chương & Bài học &rarr;</a>
+                    {{ end }}
+                {{ end }}
+            </div>
+            
+            {{ if .Curriculum }}
+                {{ range .Curriculum.Chapters }}
+                <div class="form-card" style="max-width: 100%; margin-bottom: 16px;">
+                    <h3 style="color: var(--text-bright); font-size: 16px; margin-bottom: 6px;">{{ .Title }}</h3>
+                    {{ if .Description }}
+                    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">{{ .Description }}</p>
+                    {{ end }}
+                    <div>
+                        {{ range .Lessons }}
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background-color: var(--bg-main); border-radius: 6px; margin-bottom: 6px;">
+                            <span style="color: var(--text-bright); font-size: 14px; font-weight: 500;">{{ .Title }}</span>
+                            <a href="/lesson?id={{ .ID }}" class="btn btn-primary" style="padding: 4px 12px; font-size: 12px;">Học bài &rarr;</a>
+                        </div>
+                        {{ else }}
+                        <p style="color: var(--text-muted); font-size: 13px; font-style: italic;">Chương này chưa có bài học nào.</p>
+                        {{ end }}
+                    </div>
+                </div>
+                {{ else }}
+                <div class="form-card" style="max-width: 100%; text-align: center; color: var(--text-muted);">
+                    Môn học này đang được chuẩn bị giáo trình.
+                </div>
+                {{ end }}
+            {{ else }}
+            <div class="form-card" style="max-width: 100%; text-align: center; color: var(--text-muted);">
+                Chưa có dữ liệu chương trình học.
+            </div>
+            {{ end }}
         </div>
     </main>
 </body>

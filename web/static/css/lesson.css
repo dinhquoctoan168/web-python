@@ -1,0 +1,154 @@
+/* ==========================================================================
+   LESSON & CURRICULUM STYLESHEET (Dark Theme, Pure CSS, Zero Framework)
+   ========================================================================== */
+
+@import url('/static/css/course.css');
+
+.lesson-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: calc(100vh - 60px);
+}
+
+/* Sidebar */
+.curriculum-sidebar {
+    background-color: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    padding: 20px 16px;
+    overflow-y: auto;
+}
+
+.curriculum-sidebar h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+}
+
+.chapter-group {
+    margin-bottom: 20px;
+}
+
+.chapter-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+    padding-left: 6px;
+}
+
+.lesson-item {
+    display: block;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.lesson-item:hover {
+    background-color: var(--bg-card);
+    color: var(--text-bright);
+}
+
+.lesson-item.active {
+    background-color: var(--accent-blue);
+    color: var(--text-bright);
+    font-weight: 500;
+}
+
+/* Main Content Area */
+.lesson-content-area {
+    padding: 32px 40px;
+    max-width: 900px;
+    overflow-y: auto;
+}
+
+.lesson-article {
+    line-height: 1.7;
+    font-size: 15px;
+    color: #ddd;
+    margin-bottom: 36px;
+}
+
+.lesson-article h2, .lesson-article h3 {
+    color: var(--text-bright);
+    margin: 24px 0 12px 0;
+}
+
+.lesson-article p {
+    margin-bottom: 16px;
+}
+
+.lesson-article ul, .lesson-article ol {
+    margin: 0 0 16px 24px;
+}
+
+.lesson-article li {
+    margin-bottom: 6px;
+}
+
+.lesson-article pre {
+    background-color: #121212;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #e0e0e0;
+    margin: 16px 0;
+}
+
+/* Interactive Code Runner */
+.runner-box {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 24px;
+}
+
+.runner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.runner-editor {
+    width: 100%;
+    min-height: 140px;
+    background-color: #121212;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 12px;
+    outline: none;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.runner-editor:focus {
+    border-color: var(--accent-blue-hover);
+}
+
+.runner-console {
+    background-color: #0d0d0d;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #4ec9b0;
+    min-height: 60px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    margin-top: 12px;
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/lesson.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses" class="active">Quản lý Môn</a>
+            <a href="/teacher/classes">Quản lý Lớp</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/teacher/courses" style="color: var(--accent-blue-hover); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách môn học</a>
+        </div>
+
+        <div class="page-header">
+            <div>
+                <span class="course-code" style="margin-bottom: 6px; display: inline-block;">{{ .Curriculum.CourseCode }}</span>
+                <h1 class="page-title">{{ .Curriculum.CourseName }} - Quản lý Chương & Bài học</h1>
+                <p class="page-subtitle">Thiết lập cấu trúc chương trình đào tạo, biên soạn bài giảng và xuất bản cho sinh viên.</p>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; align-items: start;">
+            <!-- Danh sách chương & bài học -->
+            <div>
+                {{ range .Curriculum.Chapters }}
+                <div class="form-card" style="max-width: 100%; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <div>
+                            <strong style="color: var(--text-bright); font-size: 16px;">{{ .Title }}</strong>
+                            {{ if .Description }}
+                            <p style="color: var(--text-muted); font-size: 13px; margin-top: 2px;">{{ .Description }}</p>
+                            {{ end }}
+                        </div>
+                        <a href="/teacher/lesson/new?chapter_id={{ .ID }}" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">+ Thêm bài học</a>
+                    </div>
+
+                    <div style="margin-top: 10px;">
+                        {{ range .Lessons }}
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background-color: var(--bg-main); border-radius: 6px; margin-bottom: 8px;">
+                            <div>
+                                <span style="color: var(--text-bright); font-size: 14px; font-weight: 500;">{{ .Title }}</span>
+                                <span class="badge-status {{ if .IsPublished }}status-active{{ else }}status-archived{{ end }}" style="margin-left: 8px;">
+                                    {{ if .IsPublished }}Đã xuất bản{{ else }}Bản nháp{{ end }}
+                                </span>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <a href="/lesson?id={{ .ID }}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Xem</a>
+                                <a href="/teacher/lesson/edit?id={{ .ID }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;">Sửa</a>
+                            </div>
+                        </div>
+                        {{ else }}
+                        <p style="color: var(--text-muted); font-size: 13px; font-style: italic; padding: 6px 0;">Chương này chưa có bài học nào.</p>
+                        {{ end }}
+                    </div>
+                </div>
+                {{ else }}
+                <div class="form-card" style="max-width: 100%; text-align: center; color: var(--text-muted);">
+                    Môn học này chưa có chương mục nào. Hãy tạo chương đầu tiên ở khung bên cạnh!
+                </div>
+                {{ end }}
+            </div>
+
+            <!-- Form tạo chương mới -->
+            <div class="form-card" style="max-width: 100%;">
+                <h3 style="color: var(--text-bright); margin-bottom: 16px;">+ Thêm chương mới</h3>
+                <form action="/teacher/chapter/create" method="POST">
+                    <input type="hidden" name="course_id" value="{{ .Curriculum.CourseID }}">
+
+                    <div class="form-group">
+                        <label for="title">Tiêu đề chương *</label>
+                        <input type="text" id="title" name="title" class="form-control" placeholder="Ví dụ: Chương 1: Giới thiệu Python" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Mô tả ngắn</label>
+                        <textarea id="description" name="description" class="form-control" placeholder="Mô tả tóm tắt nội dung chương"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="order_num">Thứ tự hiển thị</label>
+                        <input type="number" id="order_num" name="order_num" class="form-control" value="1">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px; margin-top: 8px;">Tạo chương</button>
+                </form>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

@@ -18,6 +18,7 @@ import (
 	"web_python/internal/course"
 	"web_python/internal/database"
 	"web_python/internal/frontend"
+	"web_python/internal/lesson"
 )
 
 // loadEnv đọc tệp cấu hình .env thủ công bằng standard library để không phụ thuộc lib ngoài
@@ -88,6 +89,15 @@ func main() {
 	classService := class.NewService(classRepo)
 	classHandler := class.NewHandler(classService, courseService)
 
+	lessonRepo := lesson.NewRepository(db)
+	lessonService := lesson.NewService(lessonRepo)
+	lessonHandler := lesson.NewHandler(lessonService)
+
+	// Liên kết lấy chương trình học vào trang chi tiết môn học
+	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
+		return lessonService.GetCurriculum(courseID, isTeacher)
+	})
+
 	// 4. Thiết lập Mux định tuyến thuần standard library
 	mux := http.NewServeMux()
 
@@ -106,12 +116,14 @@ func main() {
 	mux.HandleFunc("/logout", authHandler.HandleLogout)
 	mux.HandleFunc("/api/me", authHandler.HandleCurrentUser)
 
-	// Tuyến đường môn học (Sinh viên)
+	// Tuyến đường môn học & bài học (Sinh viên)
 	mux.HandleFunc("/courses", auth.RequireLogin(courseHandler.HandleListCourses))
 	mux.HandleFunc("/course", auth.RequireLogin(courseHandler.HandleCourseDetail))
+	mux.HandleFunc("/lesson", auth.RequireLogin(lessonHandler.HandleStudentLesson))
+	mux.HandleFunc("/api/course/curriculum", auth.RequireLogin(lessonHandler.HandleAPICourseCurriculum))
 	mux.HandleFunc("/my-classes", auth.RequireLogin(classHandler.HandleStudentMyClasses))
 
-	// Tuyến đường quản lý môn học & lớp học (Giảng viên)
+	// Tuyến đường quản lý môn học, lớp học & chương trình giảng dạy (Giảng viên)
 	mux.HandleFunc("/teacher/courses", auth.RequireTeacher(courseHandler.HandleTeacherListCourses))
 	mux.HandleFunc("/teacher/course/new", auth.RequireTeacher(courseHandler.HandleTeacherNewCourseForm))
 	mux.HandleFunc("/teacher/course/create", auth.RequireTeacher(courseHandler.HandleTeacherCreateCourse))
@@ -123,6 +135,13 @@ func main() {
 	mux.HandleFunc("/teacher/class/create", auth.RequireTeacher(classHandler.HandleTeacherCreateClass))
 	mux.HandleFunc("/teacher/class/enroll", auth.RequireTeacher(classHandler.HandleTeacherEnrollStudent))
 	mux.HandleFunc("/teacher/class/remove-student", auth.RequireTeacher(classHandler.HandleTeacherRemoveStudent))
+
+	mux.HandleFunc("/teacher/curriculum", auth.RequireTeacher(lessonHandler.HandleTeacherCurriculum))
+	mux.HandleFunc("/teacher/chapter/create", auth.RequireTeacher(lessonHandler.HandleTeacherCreateChapter))
+	mux.HandleFunc("/teacher/lesson/new", auth.RequireTeacher(lessonHandler.HandleTeacherNewLessonForm))
+	mux.HandleFunc("/teacher/lesson/create", auth.RequireTeacher(lessonHandler.HandleTeacherCreateLesson))
+	mux.HandleFunc("/teacher/lesson/edit", auth.RequireTeacher(lessonHandler.HandleTeacherEditLessonForm))
+	mux.HandleFunc("/teacher/lesson/update", auth.RequireTeacher(lessonHandler.HandleTeacherUpdateLesson))
 
 	// Trang giao diện IDE (yêu cầu đăng nhập)
 	mux.HandleFunc("/ide", auth.RequireLogin(frontend.HandleIDE))

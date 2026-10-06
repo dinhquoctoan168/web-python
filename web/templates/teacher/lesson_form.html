@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/lesson.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses" class="active">Quản lý Môn</a>
+            <a href="/teacher/classes">Quản lý Lớp</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/teacher/curriculum?course_id={{ .Chapter.CourseID }}" style="color: var(--accent-blue-hover); text-decoration: none; font-size: 14px;">&larr; Quay lại quản lý chương trình</a>
+        </div>
+
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">{{ if .IsNew }}Soạn bài học mới{{ else }}Chỉnh sửa bài học{{ end }}</h1>
+                <p class="page-subtitle">Chương: <strong>{{ .Chapter.Title }}</strong></p>
+            </div>
+        </div>
+
+        <div class="form-card" style="max-width: 800px;">
+            <form action="{{ if .IsNew }}/teacher/lesson/create{{ else }}/teacher/lesson/update{{ end }}" method="POST">
+                {{ if not .IsNew }}
+                <input type="hidden" name="id" value="{{ .Lesson.ID }}">
+                {{ else }}
+                <input type="hidden" name="chapter_id" value="{{ .Chapter.ID }}">
+                {{ end }}
+
+                <div class="form-group">
+                    <label for="title">Tiêu đề bài học *</label>
+                    <input type="text" id="title" name="title" class="form-control" placeholder="Ví dụ: 1.1 Khai báo biến và hàm print()" required value="{{ if .Lesson }}{{ .Lesson.Title }}{{ end }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="order_num">Thứ tự hiển thị trong chương</label>
+                    <input type="number" id="order_num" name="order_num" class="form-control" value="{{ if .Lesson }}{{ .Lesson.OrderNum }}{{ else }}1{{ end }}" style="max-width: 150px;">
+                </div>
+
+                <div class="form-group">
+                    <label for="content_html">Nội dung bài học (HTML / Văn bản / Đoạn code Python) *</label>
+                    <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 6px;">
+                        Gợi ý: Dùng các thẻ &lt;p&gt;, &lt;h3&gt;, &lt;ul&gt; và bọc đoạn code Python vào &lt;pre&gt;&lt;code class="language-python"&gt;...&lt;/code&gt;&lt;/pre&gt; để sinh viên chạy thử trực tiếp.
+                    </p>
+                    <textarea id="content_html" name="content_html" class="form-control" style="min-height: 280px; font-family: 'JetBrains Mono', monospace; font-size: 13px;" required>{{ if .Lesson }}{{ .Lesson.ContentHTML }}{{ end }}</textarea>
+                </div>
+
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="is_published" name="is_published" value="1" {{ if or .IsNew (and .Lesson .Lesson.IsPublished) }}checked{{ end }} style="width: 16px; height: 16px;">
+                    <label for="is_published" style="margin-bottom: 0; cursor: pointer;">Xuất bản cho sinh viên xem ngay</label>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">
+                        {{ if .IsNew }}Lưu & Xuất bản bài học{{ else }}Lưu thay đổi{{ end }}
+                    </button>
+                    <a href="/teacher/curriculum?course_id={{ .Chapter.CourseID }}" class="btn btn-secondary" style="padding: 10px 16px;">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

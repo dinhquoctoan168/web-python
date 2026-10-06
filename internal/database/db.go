@@ -67,6 +67,10 @@ func InitDB(dbPath string) (*sql.DB, error) {
 		if err = seedClasses(dbInstance); err != nil {
 			log.Printf("Cảnh báo seed lớp học: %v", err)
 		}
+
+		if err = seedChaptersAndLessons(dbInstance); err != nil {
+			log.Printf("Cảnh báo seed chương mục và bài học: %v", err)
+		}
 	})
 
 	return dbInstance, err
