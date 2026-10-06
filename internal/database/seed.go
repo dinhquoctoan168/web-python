@@ -3,6 +3,8 @@ package database
 import (
 	"database/sql"
 	"log"
+
+	"web_python/internal/auth"
 )
 
 func seedInitialData(db *sql.DB) error {
@@ -202,5 +204,38 @@ func seedFunctions(db *sql.DB) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// seedUsers khởi tạo các tài khoản người dùng mẫu ban đầu
+func seedUsers(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	users := []struct {
+		username, pass, name, email, role string
+	}{
+		{"admin", "admin123", "Quản trị viên", "admin@algo.edu.vn", "admin"},
+		{"teacher", "teacher123", "Giảng viên mẫu", "teacher@algo.edu.vn", "teacher"},
+		{"student", "student123", "Sinh viên mẫu", "student@algo.edu.vn", "student"},
+	}
+
+	for _, u := range users {
+		hash, err := auth.HashPassword(u.pass)
+		if err != nil {
+			return err
+		}
+		_, err = db.Exec(`INSERT INTO users (username, password_hash, full_name, email, role) VALUES (?, ?, ?, ?, ?)`,
+			u.username, hash, u.name, u.email, u.role)
+		if err != nil {
+			return err
+		}
+	}
+	log.Println("Đã tạo thành công các tài khoản mẫu: admin, teacher, student.")
 	return nil
 }

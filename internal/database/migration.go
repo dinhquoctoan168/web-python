@@ -57,6 +57,37 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 2,
+		Name:    "users",
+		Up: func(tx *sql.Tx) error {
+			queries := []string{
+				`CREATE TABLE IF NOT EXISTS users (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					username TEXT NOT NULL UNIQUE,
+					password_hash TEXT NOT NULL,
+					full_name TEXT NOT NULL,
+					email TEXT,
+					role TEXT NOT NULL,
+					is_active INTEGER DEFAULT 1,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				);`,
+				`CREATE TABLE IF NOT EXISTS sessions (
+					id TEXT PRIMARY KEY,
+					user_id INTEGER NOT NULL,
+					expires_at DATETIME NOT NULL,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY(user_id) REFERENCES users(id)
+				);`,
+			}
+			for _, q := range queries {
+				if _, err := tx.Exec(q); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

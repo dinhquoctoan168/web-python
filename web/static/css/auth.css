@@ -1,0 +1,125 @@
+/* ==========================================================================
+   AUTHENTICATION STYLESHEET (Dark Theme, Pure CSS, Zero Framework)
+   ========================================================================== */
+
+:root {
+    --bg-main: #181818;
+    --bg-card: #222222;
+    --border-color: #333333;
+    --text-primary: #cccccc;
+    --text-bright: #ffffff;
+    --text-muted: #858585;
+    --accent-blue: #0e639c;
+    --accent-blue-hover: #1177bb;
+    --danger-color: #e51400;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-container {
+    width: 100%;
+    max-width: 400px;
+    padding: 24px;
+}
+
+.auth-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 32px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.auth-header h1 {
+    color: var(--text-bright);
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.auth-header p {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.auth-error {
+    background-color: rgba(229, 20, 0, 0.15);
+    border: 1px solid var(--danger-color);
+    color: #ff8888;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    color: var(--text-primary);
+    font-size: 13px;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    background-color: #1a1a1a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-bright);
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.form-control:focus {
+    border-color: var(--accent-blue-hover);
+}
+
+.btn-submit {
+    width: 100%;
+    background-color: var(--accent-blue);
+    color: var(--text-bright);
+    border: none;
+    border-radius: 6px;
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.btn-submit:hover {
+    background-color: var(--accent-blue-hover);
+}
+
+.auth-footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+}

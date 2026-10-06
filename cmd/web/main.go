@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"web_python/internal/auth"
 	"web_python/internal/database"
 	"web_python/internal/frontend"
 )
@@ -70,24 +71,54 @@ func main() {
 	}
 	defer database.CloseDB()
 
-	// 3. Thiết lập Mux định tuyến thuần standard library
+	// 3. Khởi tạo các module
+	authRepo := auth.NewRepository(database.GetDB())
+	authService := auth.NewService(authRepo)
+	authHandler := auth.NewHandler(authService, "web/templates/login.html")
+	authMiddleware := auth.NewMiddleware(authService)
+
+	// 4. Thiết lập Mux định tuyến thuần standard library
 	mux := http.NewServeMux()
 
 	// Phục vụ tài nguyên tĩnh (CSS, JS, Fonts)
 	fs := http.FileServer(http.Dir("web/static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	// Trang giao diện IDE
-	mux.HandleFunc("/", frontend.HandleIDE)
-	mux.HandleFunc("/ide", frontend.HandleIDE)
+	// Tuyến đường xác thực
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			authHandler.HandleLogin(w, r)
+		} else {
+			authHandler.ShowLoginPage(w, r)
+		}
+	})
+	mux.HandleFunc("/logout", authHandler.HandleLogout)
+	mux.HandleFunc("/api/me", authHandler.HandleCurrentUser)
+
+	// Trang giao diện IDE (yêu cầu đăng nhập)
+	mux.HandleFunc("/ide", auth.RequireLogin(frontend.HandleIDE))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		if user := auth.GetUser(r.Context()); user == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		frontend.HandleIDE(w, r)
+	})
 
 	// API endpoints
 	mux.HandleFunc("/api/exercise", frontend.HandleAPIExercise)
 	mux.HandleFunc("/api/functions", frontend.HandleAPIFunctions)
 
+	// Bọc toàn bộ handler với AuthenticateMiddleware
+	rootHandler := authMiddleware.AuthenticateMiddleware(mux)
+
 	server := &http.Server{
 		Addr:         ":" + port,
-		Handler:      mux,
+		Handler:      rootHandler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
