@@ -16,8 +16,8 @@
             <a href="/courses">Môn học</a>
             <a href="/teacher/courses">Quản lý Môn</a>
             <a href="/teacher/classes">Quản lý Lớp</a>
-            <a href="/teacher/assignments" class="active">Giao bài tập</a>
-            <a href="/teacher/exams">Kỳ thi & Kiểm tra</a>
+            <a href="/teacher/assignments">Giao bài tập</a>
+            <a href="/teacher/exams" class="active">Kỳ thi & Kiểm tra</a>
             <a href="/teacher/submissions">Lịch sử nộp bài</a>
             <a href="/ide">Luyện tập (IDE)</a>
         </nav>
@@ -35,11 +35,11 @@
     <main class="container">
         <div class="page-header">
             <div>
-                <h1 class="page-title">Quản lý Bài tập Lớp học</h1>
-                <p class="page-subtitle">Giao bài tập từ ngân hàng câu hỏi, thiết lập điểm số và hạn nộp theo lớp.</p>
+                <h1 class="page-title">Quản lý Bài thi & Kiểm tra</h1>
+                <p class="page-subtitle">Tổ chức các bài kiểm tra có giới hạn thời gian (Timer đếm ngược đồng bộ máy chủ).</p>
             </div>
             <div>
-                <a href="/teacher/assignment/new" class="btn btn-primary">+ Giao bài tập mới</a>
+                <a href="/teacher/exam/new" class="btn btn-primary">+ Tạo bài thi mới</a>
             </div>
         </div>
 
@@ -48,40 +48,33 @@
                 <thead>
                     <tr>
                         <th style="width: 60px;">ID</th>
-                        <th>Tiêu đề bài tập</th>
+                        <th>Tên bài thi</th>
                         <th>Lớp học</th>
+                        <th style="width: 110px; text-align: center;">Thời lượng</th>
                         <th style="width: 100px; text-align: center;">Số câu</th>
                         <th style="width: 100px; text-align: center;">Tổng điểm</th>
-                        <th style="width: 160px;">Hạn nộp</th>
                         <th style="width: 110px; text-align: center;">Trạng thái</th>
-                        <th style="width: 120px; text-align: center;">Thao tác</th>
+                        <th style="width: 130px; text-align: center;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {{ range .Assignments }}
+                    {{ range .Exams }}
                     <tr>
                         <td>#{{ .ID }}</td>
                         <td>
-                            <a href="/teacher/assignment?id={{ .ID }}" style="color: var(--accent-blue, #61afef); font-weight: 600; text-decoration: none;">
-                                {{ .Title }}
-                            </a>
+                            <strong style="color: #fff; font-size: 15px;">{{ .Title }}</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">{{ .Description }}</div>
                         </td>
                         <td>
                             <strong>{{ .ClassName }}</strong>
                             <div style="font-size: 12px; color: var(--text-muted);">{{ .CourseCode }} - {{ .CourseName }}</div>
                         </td>
-                        <td style="text-align: center;"><span class="badge badge-info">{{ len .Exercises }}</span></td>
+                        <td style="text-align: center;"><strong>{{ .DurationMinutes }}</strong> phút</td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ len .Questions }}</span></td>
                         <td style="text-align: center;"><strong>{{ .TotalPoints }}</strong> đ</td>
-                        <td>
-                            {{ if .DueAt }}
-                                <span style="font-size: 13px;">{{ .DueAt.Format "02/01/2006 15:04" }}</span>
-                            {{ else }}
-                                <span style="color: var(--text-muted); font-size: 13px;">Không giới hạn</span>
-                            {{ end }}
-                        </td>
                         <td style="text-align: center;">
                             {{ if eq .Status "published" }}
-                                <span class="badge badge-success">Đã phát hành</span>
+                                <span class="badge badge-success">Đã mở</span>
                             {{ else if eq .Status "closed" }}
                                 <span class="badge badge-secondary">Đã đóng</span>
                             {{ else }}
@@ -89,13 +82,20 @@
                             {{ end }}
                         </td>
                         <td style="text-align: center;">
-                            <a href="/teacher/assignment?id={{ .ID }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Chi tiết</a>
+                            {{ if eq .Status "draft" }}
+                            <form action="/teacher/exam/publish" method="POST" style="display:inline;">
+                                <input type="hidden" name="id" value="{{ .ID }}">
+                                <button type="submit" class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;">Phát hành</button>
+                            </form>
+                            {{ else }}
+                            <span style="font-size: 12px; color: var(--text-muted);">Đang mở thi</span>
+                            {{ end }}
                         </td>
                     </tr>
                     {{ else }}
                     <tr>
                         <td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">
-                            Chưa có bài tập nào được giao. Hãy nhấn "+ Giao bài tập mới" để bắt đầu.
+                            Chưa có bài thi nào được tạo. Nhấn "+ Tạo bài thi mới" để bắt đầu.
                         </td>
                     </tr>
                     {{ end }}

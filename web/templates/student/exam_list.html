@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/my-classes">Lớp học của tôi</a>
+            <a href="/my-assignments">Bài tập</a>
+            <a href="/my-exams" class="active">Kỳ thi</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Kỳ thi & Bài kiểm tra</h1>
+                <p class="page-subtitle">Danh sách các bài kiểm tra trực tuyến được thiết lập cho lớp học của bạn.</p>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tên bài thi</th>
+                        <th>Lớp học / Môn học</th>
+                        <th style="width: 100px; text-align: center;">Thời lượng</th>
+                        <th style="width: 80px; text-align: center;">Số câu</th>
+                        <th style="width: 100px; text-align: center;">Tổng điểm</th>
+                        <th style="width: 130px; text-align: center;">Trạng thái</th>
+                        <th style="width: 140px; text-align: center;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Exams }}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 600; font-size: 15px; color: #fff;">{{ .Title }}</div>
+                            {{ if .StartAt }}
+                            <div style="font-size: 12px; color: var(--text-muted);">
+                                Mở: {{ .StartAt.Format "02/01 15:04" }} {{ if .EndAt }}- Đóng: {{ .EndAt.Format "02/01 15:04" }}{{ end }}
+                            </div>
+                            {{ end }}
+                        </td>
+                        <td>
+                            <div style="font-weight: 500;">{{ .ClassName }}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">{{ .CourseName }}</div>
+                        </td>
+                        <td style="text-align: center;"><strong>{{ .DurationMinutes }}</strong> phút</td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ .QuestionCount }}</span></td>
+                        <td style="text-align: center;"><strong>{{ .TotalPoints }}</strong> đ</td>
+                        <td style="text-align: center;">
+                            {{ if eq .SessionStatus "submitted" }}
+                                <span class="badge badge-success">&#10003; Đã nộp bài</span>
+                                {{ if .FinalScore }}
+                                <div style="font-size: 12px; font-weight: bold; color: var(--accent-blue, #61afef); margin-top: 4px;">{{ .FinalScore }} đ</div>
+                                {{ end }}
+                            {{ else if eq .SessionStatus "in_progress" }}
+                                <span class="badge badge-warning">&#9203; Đang làm</span>
+                            {{ else if eq .SessionStatus "timed_out" }}
+                                <span class="badge badge-secondary">&#9200; Hết giờ</span>
+                            {{ else }}
+                                <span class="badge badge-info">Chưa bắt đầu</span>
+                            {{ end }}
+                        </td>
+                        <td style="text-align: center;">
+                            {{ if eq .SessionStatus "submitted" }}
+                                <span style="color: var(--text-muted); font-size: 13px;">Hoàn thành</span>
+                            {{ else if not .IsOpen }}
+                                <span style="color: var(--text-muted); font-size: 13px;">Ngoài ca thi</span>
+                            {{ else }}
+                                <a href="/exam/take?id={{ .ID }}" class="btn btn-primary" style="padding: 6px 14px; font-size: 13px;">
+                                    {{ if eq .SessionStatus "in_progress" }}Tiếp tục thi &rarr;{{ else }}Bắt đầu thi &rarr;{{ end }}
+                                </a>
+                            {{ end }}
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                            Hiện không có kỳ thi nào đang mở cho các lớp bạn tham gia.
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

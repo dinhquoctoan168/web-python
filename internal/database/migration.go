@@ -389,6 +389,66 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 10,
+		Name:    "exams",
+		Up: func(tx *sql.Tx) error {
+			queries := []string{
+				`CREATE TABLE IF NOT EXISTS exams (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					class_id INTEGER NOT NULL,
+					title TEXT NOT NULL,
+					description TEXT,
+					duration_minutes INTEGER NOT NULL,
+					start_at DATETIME,
+					end_at DATETIME,
+					status TEXT DEFAULT 'draft',
+					created_by INTEGER,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY(class_id) REFERENCES classes(id),
+					FOREIGN KEY(created_by) REFERENCES users(id)
+				);`,
+				`CREATE TABLE IF NOT EXISTS exam_questions (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					exam_id INTEGER NOT NULL,
+					exercise_id INTEGER NOT NULL,
+					points REAL NOT NULL DEFAULT 1,
+					order_num INTEGER DEFAULT 0,
+					FOREIGN KEY(exam_id) REFERENCES exams(id),
+					FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+				);`,
+				`CREATE TABLE IF NOT EXISTS exam_sessions (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					exam_id INTEGER NOT NULL,
+					student_id INTEGER NOT NULL,
+					started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					submitted_at DATETIME,
+					status TEXT DEFAULT 'in_progress',
+					final_score REAL DEFAULT 0,
+					FOREIGN KEY(exam_id) REFERENCES exams(id),
+					FOREIGN KEY(student_id) REFERENCES users(id),
+					UNIQUE(exam_id, student_id)
+				);`,
+				`CREATE TABLE IF NOT EXISTS exam_session_answers (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					session_id INTEGER NOT NULL,
+					exercise_id INTEGER NOT NULL,
+					source_code TEXT,
+					score REAL DEFAULT 0,
+					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY(session_id) REFERENCES exam_sessions(id),
+					FOREIGN KEY(exercise_id) REFERENCES exercises(id),
+					UNIQUE(session_id, exercise_id)
+				);`,
+			}
+			for _, q := range queries {
+				if _, err := tx.Exec(q); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

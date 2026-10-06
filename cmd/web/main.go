@@ -18,6 +18,7 @@ import (
 	"web_python/internal/class"
 	"web_python/internal/course"
 	"web_python/internal/database"
+	"web_python/internal/exam"
 	"web_python/internal/exercise"
 	"web_python/internal/frontend"
 	"web_python/internal/judge"
@@ -118,6 +119,10 @@ func main() {
 	assignmentService := assignment.NewService(assignmentRepo)
 	assignmentHandler := assignment.NewHandler(assignmentService, classService, exerciseService)
 
+	examRepo := exam.NewRepository(db)
+	examService := exam.NewService(examRepo, judgeService)
+	examHandler := exam.NewHandler(examService, classService, exerciseService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -141,13 +146,15 @@ func main() {
 	mux.HandleFunc("/logout", authHandler.HandleLogout)
 	mux.HandleFunc("/api/me", authHandler.HandleCurrentUser)
 
-	// Tuyến đường môn học & bài học (Sinh viên)
+	// Tuyến đường môn học, bài học & thi cử (Sinh viên)
 	mux.HandleFunc("/courses", auth.RequireLogin(courseHandler.HandleListCourses))
 	mux.HandleFunc("/course", auth.RequireLogin(courseHandler.HandleCourseDetail))
 	mux.HandleFunc("/lesson", auth.RequireLogin(lessonHandler.HandleStudentLesson))
 	mux.HandleFunc("/api/course/curriculum", auth.RequireLogin(lessonHandler.HandleAPICourseCurriculum))
 	mux.HandleFunc("/my-classes", auth.RequireLogin(classHandler.HandleStudentMyClasses))
 	mux.HandleFunc("/my-assignments", auth.RequireLogin(assignmentHandler.HandleStudentMyAssignments))
+	mux.HandleFunc("/my-exams", auth.RequireLogin(examHandler.HandleStudentMyExams))
+	mux.HandleFunc("/exam/take", auth.RequireLogin(examHandler.HandleStudentTakeExam))
 
 	// Tuyến đường quản lý môn học, lớp học & chương trình giảng dạy (Giảng viên)
 	mux.HandleFunc("/teacher/courses", auth.RequireTeacher(courseHandler.HandleTeacherListCourses))
@@ -167,6 +174,11 @@ func main() {
 	mux.HandleFunc("/teacher/assignment/create", auth.RequireTeacher(assignmentHandler.HandleTeacherCreateAssignment))
 	mux.HandleFunc("/teacher/assignment", auth.RequireTeacher(assignmentHandler.HandleTeacherAssignmentDetail))
 	mux.HandleFunc("/teacher/assignment/publish", auth.RequireTeacher(assignmentHandler.HandleTeacherPublishAssignment))
+
+	mux.HandleFunc("/teacher/exams", auth.RequireTeacher(examHandler.HandleTeacherListExams))
+	mux.HandleFunc("/teacher/exam/new", auth.RequireTeacher(examHandler.HandleTeacherNewExamForm))
+	mux.HandleFunc("/teacher/exam/create", auth.RequireTeacher(examHandler.HandleTeacherCreateExam))
+	mux.HandleFunc("/teacher/exam/publish", auth.RequireTeacher(examHandler.HandleTeacherPublishExam))
 
 	mux.HandleFunc("/teacher/curriculum", auth.RequireTeacher(lessonHandler.HandleTeacherCurriculum))
 	mux.HandleFunc("/teacher/chapter/create", auth.RequireTeacher(lessonHandler.HandleTeacherCreateChapter))
@@ -203,6 +215,8 @@ func main() {
 	mux.HandleFunc("/api/submissions", auth.RequireLogin(submissionHandler.HandleCreateSubmission))
 	mux.HandleFunc("/api/submission", auth.RequireLogin(submissionHandler.HandleCreateSubmission))
 	mux.HandleFunc("/api/submissions/my", auth.RequireLogin(submissionHandler.HandleGetMySubmissions))
+	mux.HandleFunc("/api/exam/save-answer", auth.RequireLogin(examHandler.HandleAPISaveAnswer))
+	mux.HandleFunc("/api/exam/submit", auth.RequireLogin(examHandler.HandleAPISubmitExam))
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware
 	rootHandler := authMiddleware.AuthenticateMiddleware(mux)

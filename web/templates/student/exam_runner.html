@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phòng thi: {{ .Exam.Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #1e1e1e;
+        }
+        .exam-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #252526;
+            border-bottom: 1px solid #333;
+            padding: 10px 20px;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .timer-badge {
+            background-color: #332b00;
+            color: #ffd700;
+            border: 1px solid #ffd700;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .timer-urgent {
+            background-color: #441111 !important;
+            color: #ff5555 !important;
+            border-color: #ff5555 !important;
+            animation: pulse 1s infinite;
+        }
+        .exam-body {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 60px);
+        }
+        .sidebar-questions {
+            width: 320px;
+            background-color: #252526;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .question-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+        .q-item {
+            padding: 14px 18px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .q-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .q-item.active {
+            background-color: #094771;
+            border-left: 4px solid #007acc;
+        }
+        .q-num {
+            font-size: 12px;
+            color: #858585;
+            text-transform: uppercase;
+        }
+        .q-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-top: 4px;
+        }
+        .q-points {
+            font-size: 12px;
+            color: #61afef;
+            margin-top: 2px;
+        }
+        .main-workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .question-detail {
+            height: 35%;
+            padding: 16px 24px;
+            overflow-y: auto;
+            border-bottom: 1px solid #333;
+            background-color: #1e1e1e;
+        }
+        .editor-container {
+            height: 65%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .editor-textarea {
+            flex: 1;
+            background-color: #1a1a1a;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            padding: 16px;
+            border: none;
+            resize: none;
+            outline: none;
+            line-height: 1.5;
+            tab-size: 4;
+        }
+        .editor-footer {
+            padding: 8px 16px;
+            background-color: #252526;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #858585;
+        }
+    </style>
+</head>
+<body>
+    <header class="exam-header">
+        <div>
+            <span style="font-size: 12px; color: #858585; text-transform: uppercase;">Phòng thi trực tuyến</span>
+            <div style="font-size: 18px; font-weight: 700; color: #fff;">{{ .Exam.Title }}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div id="examTimer" class="timer-badge">
+                <span>&#9200;</span>
+                <span id="timerText">--:--</span>
+            </div>
+            <button id="btnSubmitExam" class="btn btn-primary" style="padding: 8px 18px; font-weight: 600; background-color: #28a745;">
+                Nộp bài thi &#10003;
+            </button>
+        </div>
+    </header>
+
+    <div class="exam-body">
+        <aside class="sidebar-questions">
+            <div style="padding: 12px 18px; font-size: 13px; font-weight: 600; color: #858585; border-bottom: 1px solid #333;">
+                DANH SÁCH CÂU HỎI ({{ len .Exam.Questions }})
+            </div>
+            <div class="question-list">
+                {{ range $index, $q := .Exam.Questions }}
+                <div class="q-item {{ if eq $index 0 }}active{{ end }}" data-index="{{ $index }}" data-exid="{{ $q.ExerciseID }}">
+                    <div class="q-num">Câu {{ $q.OrderNum }}</div>
+                    <div class="q-title">{{ $q.ExerciseTitle }}</div>
+                    <div class="q-points">{{ $q.Points }} điểm &bull; {{ $q.Difficulty }}</div>
+                </div>
+                {{ end }}
+            </div>
+        </aside>
+
+        <main class="main-workspace">
+            <div class="question-detail" id="qDescriptionView">
+                <h2 id="qTitle" style="color: #fff; margin-top: 0; font-size: 18px;"></h2>
+                <div id="qDescription" style="color: #cccccc; line-height: 1.6; font-size: 14px; white-space: pre-wrap;"></div>
+            </div>
+
+            <div class="editor-container">
+                <textarea id="examCodeEditor" class="editor-textarea" placeholder="# Viết mã nguồn Python cho câu hỏi tại đây..."></textarea>
+                <div class="editor-footer">
+                    <span id="saveStatus">Đã lưu tự động</span>
+                    <span>Nhấn Tab để thụt dòng 4 dấu cách</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const examQuestions = [
+            {{ range .Exam.Questions }}
+            {
+                id: {{ .ExerciseID }},
+                order: {{ .OrderNum }},
+                title: {{ .ExerciseTitle }},
+                description: {{ .ExerciseDescription }},
+                points: {{ .Points }},
+                difficulty: {{ .Difficulty }},
+                initialCode: {{ .InitialCode }}
+            },
+            {{ end }}
+        ];
+
+        let answers = JSON.parse('{{ .AnswersJSON }}' || '{}');
+        const sessionID = {{ .Session.ID }};
+        let remainingSeconds = {{ .Session.RemainingSeconds }};
+        let currentQuestionIdx = 0;
+        let saveTimeout = null;
+
+        const timerText = document.getElementById('timerText');
+        const examTimer = document.getElementById('examTimer');
+        const qTitle = document.getElementById('qTitle');
+        const qDescription = document.getElementById('qDescription');
+        const codeEditor = document.getElementById('examCodeEditor');
+        const saveStatus = document.getElementById('saveStatus');
+        const qItems = document.querySelectorAll('.q-item');
+
+        // Khởi tạo hiển thị câu đầu tiên
+        function loadQuestion(idx) {
+            currentQuestionIdx = idx;
+            const q = examQuestions[idx];
+            if (!q) return;
+
+            qTitle.textContent = `Câu ${q.order}: ${q.title} (${q.points} điểm)`;
+            qDescription.textContent = q.description;
+
+            // Nạp code đã làm hoặc initialCode
+            const savedCode = answers[q.id];
+            codeEditor.value = (savedCode !== undefined && savedCode !== null) ? savedCode : (q.initialCode || '');
+
+            qItems.forEach((item, i) => {
+                item.classList.toggle('active', i === idx);
+            });
+        }
+
+        // Lưu câu trả lời tự động (Debounce)
+        function triggerAutoSave() {
+            saveStatus.textContent = "Đang lưu...";
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                const q = examQuestions[currentQuestionIdx];
+                if (!q) return;
+                const code = codeEditor.value;
+                answers[q.id] = code;
+
+                fetch('/api/exam/save-answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionID,
+                        exercise_id: q.id,
+                        source_code: code
+                    })
+                }).then(() => {
+                    saveStatus.textContent = "Đã lưu tự động (" + new Date().toLocaleTimeString() + ")";
+                }).catch(() => {
+                    saveStatus.textContent = "Lỗi lưu mã nguồn";
+                });
+            }, 800);
+        }
+
+        codeEditor.addEventListener('input', triggerAutoSave);
+
+        // Hỗ trợ thụt dòng bằng phím Tab
+        codeEditor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+                triggerAutoSave();
+            }
+        });
+
+        // Chuyển câu hỏi khi click sidebar
+        qItems.forEach(item => {
+            item.addEventListener('click', function() {
+                const idx = parseInt(this.getAttribute('data-index'), 10);
+                loadQuestion(idx);
+            });
+        });
+
+        // Đồng hồ đếm ngược đồng bộ máy chủ
+        function updateTimer() {
+            if (remainingSeconds <= 0) {
+                timerText.textContent = "00:00 - HẾT GIỜ";
+                examTimer.classList.add('timer-urgent');
+                submitExam(true);
+                return;
+            }
+
+            const mins = Math.floor(remainingSeconds / 60);
+            const secs = remainingSeconds % 60;
+            timerText.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            if (remainingSeconds < 300) { // Dưới 5 phút
+                examTimer.classList.add('timer-urgent');
+            }
+
+            remainingSeconds--;
+            setTimeout(updateTimer, 1000);
+        }
+
+        // Nộp bài thi
+        function submitExam(autoSubmit) {
+            if (!autoSubmit && !confirm("Bạn có chắc chắn muốn nộp bài thi ngay bây giờ? Sau khi nộp bạn sẽ không thể sửa đổi bài làm.")) {
+                return;
+            }
+
+            // Lưu câu hiện tại trước khi submit
+            const q = examQuestions[currentQuestionIdx];
+            if (q) {
+                answers[q.id] = codeEditor.value;
+            }
+
+            fetch('/api/exam/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionID })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(`Bài thi đã được nộp thành công! Điểm tổng kết: ${data.final_score} điểm.`);
+                window.location.href = '/my-exams';
+            })
+            .catch(err => {
+                alert("Lỗi nộp bài: " + err);
+            });
+        }
+
+        document.getElementById('btnSubmitExam').addEventListener('click', () => submitExam(false));
+
+        // Khởi động
+        loadQuestion(0);
+        updateTimer();
+    </script>
+</body>
+</html>
