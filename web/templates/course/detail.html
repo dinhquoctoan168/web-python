@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/course.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses" class="active">Môn học</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+            {{ if .User }}
+                {{ if or (eq .User.Role "teacher") (eq .User.Role "admin") }}
+                <a href="/teacher/courses">Khu vực Giảng viên</a>
+                {{ end }}
+            {{ end }}
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/courses" style="color: var(--accent-blue-hover); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách môn học</a>
+        </div>
+
+        <div class="page-header">
+            <div>
+                <span class="course-code" style="margin-bottom: 8px; display: inline-block;">{{ .Course.Code }}</span>
+                <h1 class="page-title">{{ .Course.Name }}</h1>
+                <p class="page-subtitle">{{ .Course.Description }}</p>
+            </div>
+            <div>
+                <a href="/ide" class="btn btn-success" style="padding: 10px 18px; font-size: 14px;">Mở Web IDE Luyện tập</a>
+            </div>
+        </div>
+
+        <div class="form-card" style="max-width: 100%;">
+            <h3 style="color: var(--text-bright); margin-bottom: 12px;">Thông tin môn học</h3>
+            <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 16px;">
+                Giảng viên phụ trách: <strong>{{ if .Course.TeacherName }}{{ .Course.TeacherName }}{{ else }}Bộ môn{{ end }}</strong><br>
+                Trạng thái: <span class="badge-status status-active">{{ .Course.Status }}</span><br>
+                Ngày tạo: {{ .Course.CreatedAt.Format "02/01/2006" }}
+            </p>
+            <p style="color: var(--text-primary); font-size: 14px;">
+                Các bài học (Lessons) và lớp học (Classes) sẽ được đồng bộ và cập nhật trong các phase phát triển tiếp theo của hệ thống.
+            </p>
+        </div>
+    </main>
+</body>
+</html>

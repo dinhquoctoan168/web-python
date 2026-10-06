@@ -1,0 +1,327 @@
+/* ==========================================================================
+   COURSE & TEACHER STYLESHEET (Dark Theme, Pure CSS, Zero Framework)
+   ========================================================================== */
+
+:root {
+    --bg-main: #181818;
+    --bg-header: #1f1f1f;
+    --bg-panel: #222222;
+    --bg-card: #262626;
+    --bg-card-hover: #2e2e2e;
+    --border-color: #333333;
+    --border-subtle: #2a2a2a;
+    
+    --text-primary: #cccccc;
+    --text-bright: #ffffff;
+    --text-muted: #858585;
+    
+    --accent-blue: #0e639c;
+    --accent-blue-hover: #1177bb;
+    --accent-green: #388e3c;
+    --accent-warning: #f57c00;
+    --danger-color: #d32f2f;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header & Navbar */
+.navbar {
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--text-bright);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.nav-links a {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.nav-links a:hover, .nav-links a.active {
+    background-color: var(--bg-card);
+    color: var(--text-bright);
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.badge-role {
+    background-color: #333;
+    color: #4ec9b0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+/* Page Layout */
+.container {
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 32px 20px;
+    flex: 1;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.page-title {
+    font-size: 24px;
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.page-subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+/* Course Grid */
+.course-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.course-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.course-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-blue-hover);
+}
+
+.course-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.course-code {
+    background-color: var(--accent-blue);
+    color: var(--text-bright);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.course-title {
+    font-size: 18px;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.course-desc {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    flex: 1;
+}
+
+.course-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background-color: var(--accent-blue);
+    color: var(--text-bright);
+}
+.btn-primary:hover {
+    background-color: var(--accent-blue-hover);
+}
+
+.btn-success {
+    background-color: var(--accent-green);
+    color: var(--text-bright);
+}
+.btn-success:hover {
+    filter: brightness(1.1);
+}
+
+.btn-secondary {
+    background-color: #333333;
+    color: var(--text-primary);
+}
+.btn-secondary:hover {
+    background-color: #444444;
+}
+
+/* Table */
+.table-container {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.data-table th, .data-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    background-color: var(--bg-panel);
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.data-table tr:hover {
+    background-color: var(--bg-card-hover);
+}
+
+.badge-status {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-active {
+    background-color: rgba(56, 142, 60, 0.2);
+    color: #81c784;
+    border: 1px solid #388e3c;
+}
+
+.status-archived {
+    background-color: rgba(133, 133, 133, 0.2);
+    color: #aaa;
+    border: 1px solid #666;
+}
+
+/* Forms */
+.form-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 28px;
+    max-width: 600px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    background-color: #1a1a1a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-bright);
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+}
+
+.form-control:focus {
+    border-color: var(--accent-blue-hover);
+}
+
+textarea.form-control {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.form-error {
+    background-color: rgba(211, 47, 47, 0.15);
+    border: 1px solid var(--danger-color);
+    color: #ff8888;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 13px;
+}

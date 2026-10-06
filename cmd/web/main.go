@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"web_python/internal/auth"
+	"web_python/internal/course"
 	"web_python/internal/database"
 	"web_python/internal/frontend"
 )
@@ -72,10 +73,15 @@ func main() {
 	defer database.CloseDB()
 
 	// 3. Khởi tạo các module
-	authRepo := auth.NewRepository(database.GetDB())
+	db := database.GetDB()
+	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo)
 	authHandler := auth.NewHandler(authService, "web/templates/login.html")
 	authMiddleware := auth.NewMiddleware(authService)
+
+	courseRepo := course.NewRepository(db)
+	courseService := course.NewService(courseRepo)
+	courseHandler := course.NewHandler(courseService)
 
 	// 4. Thiết lập Mux định tuyến thuần standard library
 	mux := http.NewServeMux()
@@ -95,6 +101,17 @@ func main() {
 	mux.HandleFunc("/logout", authHandler.HandleLogout)
 	mux.HandleFunc("/api/me", authHandler.HandleCurrentUser)
 
+	// Tuyến đường môn học (Sinh viên)
+	mux.HandleFunc("/courses", auth.RequireLogin(courseHandler.HandleListCourses))
+	mux.HandleFunc("/course", auth.RequireLogin(courseHandler.HandleCourseDetail))
+
+	// Tuyến đường quản lý môn học (Giảng viên)
+	mux.HandleFunc("/teacher/courses", auth.RequireTeacher(courseHandler.HandleTeacherListCourses))
+	mux.HandleFunc("/teacher/course/new", auth.RequireTeacher(courseHandler.HandleTeacherNewCourseForm))
+	mux.HandleFunc("/teacher/course/create", auth.RequireTeacher(courseHandler.HandleTeacherCreateCourse))
+	mux.HandleFunc("/teacher/course/edit", auth.RequireTeacher(courseHandler.HandleTeacherEditCourseForm))
+	mux.HandleFunc("/teacher/course/update", auth.RequireTeacher(courseHandler.HandleTeacherUpdateCourse))
+
 	// Trang giao diện IDE (yêu cầu đăng nhập)
 	mux.HandleFunc("/ide", auth.RequireLogin(frontend.HandleIDE))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +123,7 @@ func main() {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		frontend.HandleIDE(w, r)
+		http.Redirect(w, r, "/courses", http.StatusSeeOther)
 	})
 
 	// API endpoints

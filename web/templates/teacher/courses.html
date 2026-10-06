@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/course.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Giao diện Sinh viên</a>
+            <a href="/teacher/courses" class="active">Quản lý Môn học</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Quản lý Môn học</h1>
+                <p class="page-subtitle">Quản lý danh sách các học phần, thiết lập trạng thái và nội dung đào tạo.</p>
+            </div>
+            <div>
+                <a href="/teacher/course/new" class="btn btn-primary">+ Thêm môn học mới</a>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 120px;">Mã môn</th>
+                        <th>Tên môn học</th>
+                        <th>Mô tả</th>
+                        <th style="width: 140px;">Giảng viên</th>
+                        <th style="width: 110px;">Trạng thái</th>
+                        <th style="width: 100px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Courses }}
+                    <tr>
+                        <td><strong>{{ .Code }}</strong></td>
+                        <td>{{ .Name }}</td>
+                        <td style="color: var(--text-muted); font-size: 13px;">{{ .Description }}</td>
+                        <td>{{ if .TeacherName }}{{ .TeacherName }}{{ else }}-{{ end }}</td>
+                        <td>
+                            <span class="badge-status status-{{ .Status }}">{{ .Status }}</span>
+                        </td>
+                        <td>
+                            <a href="/teacher/course/edit?id={{ .ID }}" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;">Sửa</a>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                            Chưa có môn học nào. Bấm "+ Thêm môn học mới" để tạo.
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

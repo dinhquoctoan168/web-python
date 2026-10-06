@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/course.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses" class="active">Môn học</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+            {{ if .User }}
+                {{ if or (eq .User.Role "teacher") (eq .User.Role "admin") }}
+                <a href="/teacher/courses">Khu vực Giảng viên</a>
+                {{ end }}
+            {{ end }}
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ else }}
+                <a href="/login" class="btn btn-primary" style="padding: 4px 10px;">Đăng nhập</a>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Khóa học & Môn học</h1>
+                <p class="page-subtitle">Chọn một môn học để bắt đầu theo dõi nội dung, bài tập và lộ trình học tập.</p>
+            </div>
+        </div>
+
+        <div class="course-grid">
+            {{ range .Courses }}
+            <div class="course-card">
+                <div>
+                    <div class="course-header">
+                        <span class="course-code">{{ .Code }}</span>
+                    </div>
+                    <h2 class="course-title">{{ .Name }}</h2>
+                    <p class="course-desc">{{ .Description }}</p>
+                </div>
+                <div class="course-footer">
+                    <span>GV: {{ if .TeacherName }}{{ .TeacherName }}{{ else }}Bộ môn{{ end }}</span>
+                    <a href="/course?id={{ .ID }}" class="btn btn-primary">Xem chi tiết</a>
+                </div>
+            </div>
+            {{ else }}
+            <p style="color: var(--text-muted);">Hiện chưa có môn học nào được kích hoạt.</p>
+            {{ end }}
+        </div>
+    </main>
+</body>
+</html>

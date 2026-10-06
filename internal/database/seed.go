@@ -239,3 +239,53 @@ func seedUsers(db *sql.DB) error {
 	log.Println("Đã tạo thành công các tài khoản mẫu: admin, teacher, student.")
 	return nil
 }
+
+// seedCourses nạp danh mục 3 môn học mẫu ban đầu
+func seedCourses(db *sql.DB) error {
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM courses").Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	var teacherID sql.NullInt64
+	_ = db.QueryRow("SELECT id FROM users WHERE role = 'teacher' LIMIT 1").Scan(&teacherID)
+
+	courses := []struct {
+		code, name, desc string
+	}{
+		{
+			"PY101",
+			"Python cơ bản",
+			"Học phần nhập môn lập trình với ngôn ngữ Python: cú pháp, kiểu dữ liệu, rẽ nhánh, vòng lặp và hàm cơ bản.",
+		},
+		{
+			"PRG201",
+			"Kỹ thuật lập trình",
+			"Học phần kỹ thuật lập trình: module, quản lý ngoại lệ, thiết kế giải thuật và lập trình hướng đối tượng (OOP).",
+		},
+		{
+			"DSA301",
+			"Cấu trúc dữ liệu và giải thuật",
+			"Học phần CSDL & Giải thuật: Mảng, Danh sách liên kết, Ngăn xếp, Hàng đợi, Cây nhị phân và Thuật toán sắp xếp/tìm kiếm.",
+		},
+	}
+
+	for _, c := range courses {
+		var createdBy any
+		if teacherID.Valid {
+			createdBy = teacherID.Int64
+		}
+		_, err := db.Exec(`INSERT INTO courses (code, name, description, status, created_by) VALUES (?, ?, ?, 'active', ?)`,
+			c.code, c.name, c.desc, createdBy)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Println("Đã nạp thành công 3 môn học mẫu: PY101, PRG201, DSA301.")
+	return nil
+}
+

@@ -25,7 +25,11 @@ func NewHandler(service *Service, tmplPattern string) *Handler {
 func (h *Handler) ShowLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Nếu đã đăng nhập, chuyển hướng thẳng vào /ide
 	if user := GetUser(r.Context()); user != nil {
-		http.Redirect(w, r, "/ide", http.StatusSeeOther)
+		if user.Role == RoleTeacher || user.Role == RoleAdmin {
+			http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
+		} else {
+			http.Redirect(w, r, "/courses", http.StatusSeeOther)
+		}
 		return
 	}
 
@@ -69,8 +73,11 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 	})
 
-	_ = user
-	http.Redirect(w, r, "/ide", http.StatusSeeOther)
+	if user.Role == RoleTeacher || user.Role == RoleAdmin {
+		http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
+	} else {
+		http.Redirect(w, r, "/courses", http.StatusSeeOther)
+	}
 }
 
 // HandleLogout xử lý đăng xuất

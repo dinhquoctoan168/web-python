@@ -88,6 +88,24 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 3,
+		Name:    "courses",
+		Up: func(tx *sql.Tx) error {
+			query := `CREATE TABLE IF NOT EXISTS courses (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				code TEXT NOT NULL UNIQUE,
+				name TEXT NOT NULL,
+				description TEXT,
+				status TEXT DEFAULT 'active',
+				created_by INTEGER,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY(created_by) REFERENCES users(id)
+			);`
+			_, err := tx.Exec(query)
+			return err
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

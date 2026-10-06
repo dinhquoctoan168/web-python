@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/course.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Giao diện Sinh viên</a>
+            <a href="/teacher/courses" class="active">Quản lý Môn học</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/teacher/courses" style="color: var(--accent-blue-hover); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách quản lý môn học</a>
+        </div>
+
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">{{ if .IsNew }}Tạo môn học mới{{ else }}Chỉnh sửa môn học{{ end }}</h1>
+            </div>
+        </div>
+
+        {{ if .Error }}
+        <div class="form-error">
+            {{ .Error }}
+        </div>
+        {{ end }}
+
+        <div class="form-card">
+            <form action="{{ if .IsNew }}/teacher/course/create{{ else }}/teacher/course/update{{ end }}" method="POST">
+                {{ if not .IsNew }}
+                <input type="hidden" name="id" value="{{ .Course.ID }}">
+                {{ end }}
+
+                <div class="form-group">
+                    <label for="code">Mã môn học (Ví dụ: PY101, PRG201, DSA301) *</label>
+                    <input type="text" id="code" name="code" class="form-control" placeholder="Nhập mã môn học" required value="{{ if .Course }}{{ .Course.Code }}{{ end }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="name">Tên môn học *</label>
+                    <input type="text" id="name" name="name" class="form-control" placeholder="Nhập tên môn học" required value="{{ if .Course }}{{ .Course.Name }}{{ end }}">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Mô tả học phần</label>
+                    <textarea id="description" name="description" class="form-control" placeholder="Mô tả tóm tắt nội dung học phần">{{ if .Course }}{{ .Course.Description }}{{ end }}</textarea>
+                </div>
+
+                {{ if not .IsNew }}
+                <div class="form-group">
+                    <label for="status">Trạng thái</label>
+                    <select id="status" name="status" class="form-control">
+                        <option value="active" {{ if eq .Course.Status "active" }}selected{{ end }}>Kích hoạt (active)</option>
+                        <option value="archived" {{ if eq .Course.Status "archived" }}selected{{ end }}>Ẩn / Lưu trữ (archived)</option>
+                    </select>
+                </div>
+                {{ end }}
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
+                        {{ if .IsNew }}Tạo môn học{{ else }}Lưu thay đổi{{ end }}
+                    </button>
+                    <a href="/teacher/courses" class="btn btn-secondary" style="padding: 10px 16px;">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>
