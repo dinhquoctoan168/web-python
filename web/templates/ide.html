@@ -171,7 +171,25 @@
                     </div>
                 </div>
 
-                <div class="editor-body">
+                <!-- Khung câu hỏi trắc nghiệm & Code Tracing (Phase 13) -->
+                <div id="quizSection" class="quiz-section" style="display: none;">
+                    <div class="quiz-card">
+                        <div class="quiz-header">
+                            <span class="quiz-badge">&#9997; Câu hỏi trắc nghiệm / Code Tracing</span>
+                            <h3 id="quizTitle" class="quiz-title"></h3>
+                        </div>
+                        <div id="quizQuestionDesc" class="quiz-desc"></div>
+                        <div id="quizOptionsList" class="quiz-options"></div>
+                        <div class="quiz-footer">
+                            <button id="btnSubmitQuiz" type="button" class="btn btn-primary" onclick="submitQuizChoice()">
+                                <span class="icon">&#10003;</span> Nộp câu trả lời
+                            </button>
+                            <span id="quizResultMsg" class="quiz-result-msg"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor-body" id="editorBody">
                     <div class="line-numbers" id="lineNumbers">1</div>
                     <div class="editor-code-container">
                         <pre id="highlighting" aria-hidden="true"><code id="highlightingCode"></code></pre>

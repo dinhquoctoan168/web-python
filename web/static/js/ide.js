@@ -448,8 +448,133 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLineNumbers();
         updateHighlighting();
 
+        // Xử lý bài tập trắc nghiệm / Code Tracing (Phase 13)
+        const quizSection = document.getElementById('quizSection');
+        const editorBody = document.getElementById('editorBody');
+        const isQuiz = (ex.exercise_type === 'multiple_choice' || ex.exercise_type === 'quiz');
+
+        if (quizSection) {
+            if (isQuiz) {
+                quizSection.style.display = 'block';
+                const qTitle = document.getElementById('quizTitle');
+                const qDesc = document.getElementById('quizQuestionDesc');
+                const qMsg = document.getElementById('quizResultMsg');
+                if (qTitle) qTitle.textContent = ex.title;
+                if (qDesc) qDesc.textContent = ex.description;
+                if (qMsg) {
+                    qMsg.textContent = '';
+                    qMsg.className = 'quiz-result-msg';
+                }
+                loadQuizOptions(ex.id);
+            } else {
+                quizSection.style.display = 'none';
+            }
+        }
+
+        if (editorBody) {
+            const hasInitialCode = (ex.initialCode || ex.initial_code || '').trim().length > 0;
+            if (isQuiz && !hasInitialCode) {
+                editorBody.style.display = 'none';
+            } else {
+                editorBody.style.display = 'flex';
+            }
+        }
+
         // Nạp bản nháp đã lưu của học viên từ server (nếu có)
         loadSavedDraft(ex.id);
+    };
+
+    // Phase 13: Tải các lựa chọn trắc nghiệm từ API bảo mật (tuyệt đối không lộ đáp án đúng)
+    function loadQuizOptions(exerciseId) {
+        const listEl = document.getElementById('quizOptionsList');
+        if (listEl) {
+            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">Đang tải các phương án lựa chọn...</div>';
+        }
+        fetch(`/api/quiz?exercise_id=${exerciseId}`)
+            .then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(options => {
+                renderQuizOptions(options);
+            })
+            .catch(err => {
+                if (listEl) {
+                    listEl.innerHTML = `<div style="color:var(--accent-ruby); font-size:13px;">Lỗi tải phương án: ${escapeHtml(err.message)}</div>`;
+                }
+            });
+    }
+
+    function renderQuizOptions(options) {
+        const listEl = document.getElementById('quizOptionsList');
+        if (!listEl) return;
+        if (!options || options.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:13px;">Chưa có phương án nào được cấu hình cho câu hỏi này.</div>';
+            return;
+        }
+        listEl.innerHTML = options.map((opt, idx) => {
+            const charLabel = String.fromCharCode(65 + idx);
+            return `
+                <label class="quiz-option-label" id="quizLabel-${opt.id}">
+                    <input type="radio" name="quizOption" value="${opt.id}" class="quiz-option-radio" onchange="handleQuizOptionSelect(${opt.id})">
+                    <strong style="color:var(--accent-green); min-width:20px;">${charLabel}.</strong>
+                    <span class="quiz-option-text">${escapeHtml(opt.content)}</span>
+                </label>
+            `;
+        }).join('');
+    }
+
+    window.handleQuizOptionSelect = function(selectedId) {
+        document.querySelectorAll('.quiz-option-label').forEach(lbl => {
+            lbl.classList.remove('selected');
+        });
+        const activeLbl = document.getElementById(`quizLabel-${selectedId}`);
+        if (activeLbl) activeLbl.classList.add('selected');
+    };
+
+    window.submitQuizChoice = function() {
+        if (!currentExercise) return;
+        const selectedRadio = document.querySelector('input[name="quizOption"]:checked');
+        const msgEl = document.getElementById('quizResultMsg');
+        if (!selectedRadio) {
+            if (msgEl) {
+                msgEl.textContent = 'Vui lòng chọn một đáp án trước khi nộp!';
+                msgEl.className = 'quiz-result-msg incorrect';
+            }
+            return;
+        }
+        const optionId = parseInt(selectedRadio.value, 10);
+        const btnSubmit = document.getElementById('btnSubmitQuiz');
+        if (btnSubmit) btnSubmit.disabled = true;
+
+        fetch('/api/quiz/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exercise_id: currentExercise.id, option_id: optionId })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (btnSubmit) btnSubmit.disabled = false;
+            if (msgEl) {
+                msgEl.textContent = data.message || (data.is_correct ? 'Chính xác! Điểm: ' + data.score : 'Chưa chính xác!');
+                msgEl.className = 'quiz-result-msg ' + (data.is_correct ? 'correct' : 'incorrect');
+            }
+            if (data.is_correct) {
+                updateExerciseBullet(currentExercise.id, 'completed');
+            } else {
+                updateExerciseBullet(currentExercise.id, 'in_progress');
+            }
+        })
+        .catch(err => {
+            if (btnSubmit) btnSubmit.disabled = false;
+            if (msgEl) {
+                msgEl.textContent = 'Lỗi nộp bài: ' + err.message;
+                msgEl.className = 'quiz-result-msg incorrect';
+            }
+        });
     };
 
     // Chuyển đổi trạng thái Ẩn/Hiện đề bài nội tuyến
@@ -540,6 +665,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 8. Chấm thử (Test Cases)
     function runTests() {
+        if (currentExercise && (currentExercise.exercise_type === 'multiple_choice' || currentExercise.exercise_type === 'quiz')) {
+            submitQuizChoice();
+            return;
+        }
+
         recordAttemptAction('test');
         const code = codeEditor.value;
         const allowed = currentExercise ? (currentExercise.allowedFunctions || currentExercise.allowed_functions || []) : [];

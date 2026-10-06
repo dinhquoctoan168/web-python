@@ -24,6 +24,7 @@ import (
 	"web_python/internal/judge"
 	"web_python/internal/lesson"
 	"web_python/internal/practice"
+	"web_python/internal/quiz"
 	"web_python/internal/submission"
 )
 
@@ -123,6 +124,10 @@ func main() {
 	examService := exam.NewService(examRepo, judgeService)
 	examHandler := exam.NewHandler(examService, classService, exerciseService)
 
+	quizRepo := quiz.NewRepository(db)
+	quizService := quiz.NewService(quizRepo, practiceService, submissionService)
+	quizHandler := quiz.NewHandler(quizService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -219,6 +224,8 @@ func main() {
 	mux.HandleFunc("/api/exam/save-answer", auth.RequireLogin(examHandler.HandleAPISaveAnswer))
 	mux.HandleFunc("/api/exam/submit", auth.RequireLogin(examHandler.HandleAPISubmitExam))
 	mux.HandleFunc("/api/exam/event", auth.RequireLogin(examHandler.HandleAPIRecordExamEvent))
+	mux.HandleFunc("/api/quiz", auth.RequireLogin(quizHandler.HandleGetOptions))
+	mux.HandleFunc("/api/quiz/submit", auth.RequireLogin(quizHandler.HandleSubmitQuiz))
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware
 	rootHandler := authMiddleware.AuthenticateMiddleware(mux)

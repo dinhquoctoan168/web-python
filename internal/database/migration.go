@@ -465,6 +465,54 @@ var migrations = []Migration{
 			return err
 		},
 	},
+	{
+		Version: 12,
+		Name:    "quiz_options",
+		Up: func(tx *sql.Tx) error {
+			createTable := `CREATE TABLE IF NOT EXISTS exercise_options (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				exercise_id INTEGER NOT NULL,
+				content TEXT NOT NULL,
+				is_correct INTEGER DEFAULT 0,
+				order_num INTEGER DEFAULT 0,
+				FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+			);`
+			if _, err := tx.Exec(createTable); err != nil {
+				return err
+			}
+
+			// Thêm bài tập mẫu trắc nghiệm & code tracing vào ngân hàng câu hỏi
+			insertQuizEx := `INSERT OR IGNORE INTO exercises (id, course_id, topic_id, title, exercise_type, difficulty, description, initial_code, status)
+			VALUES 
+			(10, 3, 1, 'Trắc nghiệm: Kiểu dữ liệu cơ bản', 'multiple_choice', 'Dễ', 'Trong các nhóm sau, nhóm nào toàn bộ đều là kiểu dữ liệu có sẵn trong Python?', '', 'active'),
+			(11, 3, 1, 'Code Tracing: Vòng lặp for & Biến tích lũy', 'multiple_choice', 'Dễ', 'Quan sát đoạn mã sau:\n\nx = 1\nfor i in range(3):\n    x *= 2\nprint(x)\n\nChương trình trên sẽ in ra giá trị gì tại màn hình console?', '', 'active');`
+			if _, err := tx.Exec(insertQuizEx); err != nil {
+				return err
+			}
+
+			// Thêm các phương án lựa chọn cho câu 10
+			insertOpt10 := `INSERT INTO exercise_options (exercise_id, content, is_correct, order_num) VALUES
+			(10, 'int, float, str, list', 1, 1),
+			(10, 'var, val, let, const', 0, 2),
+			(10, 'integer, decimal, string, array', 0, 3),
+			(10, 'number, character, boolean', 0, 4);`
+			if _, err := tx.Exec(insertOpt10); err != nil {
+				return err
+			}
+
+			// Thêm các phương án lựa chọn cho câu 11 (Code Tracing)
+			insertOpt11 := `INSERT INTO exercise_options (exercise_id, content, is_correct, order_num) VALUES
+			(11, '6', 0, 1),
+			(11, '8', 1, 2),
+			(11, '4', 0, 3),
+			(11, '16', 0, 4);`
+			if _, err := tx.Exec(insertOpt11); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

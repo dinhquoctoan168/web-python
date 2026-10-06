@@ -10,7 +10,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
+func setupTestDB(t *testing.T) (*sql.DB, int) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Không thể mở in-memory sqlite: %v", err)
@@ -42,22 +42,22 @@ func setupTestDB(t *testing.T) *sql.DB {
 		(exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) 
 		VALUES (?, '[100, 200, 50]', 'find_min_max([100, 200, 50])', '(50, 200)', 1, 2.0, 99)`, exID)
 
-	return db
+	return db, int(exID)
 }
 
 func TestGetExerciseForClient_SecurityIsolation(t *testing.T) {
-	db := setupTestDB(t)
+	db, exID := setupTestDB(t)
 	defer db.Close()
 
 	repo := NewRepository(db)
 	svc := NewService(repo)
 
-	clientEx, err := svc.GetExerciseForClient(1)
+	clientEx, err := svc.GetExerciseForClient(exID)
 	if err != nil {
 		t.Fatalf("GetExerciseForClient thất bại: %v", err)
 	}
 	if clientEx == nil {
-		t.Fatalf("Kỳ vọng tìm thấy bài tập với ID = 1")
+		t.Fatalf("Kỳ vọng tìm thấy bài tập với ID = %d", exID)
 	}
 
 	// 1. Kiểm tra không chứa hidden test cases
@@ -83,13 +83,13 @@ func TestGetExerciseForClient_SecurityIsolation(t *testing.T) {
 }
 
 func TestGetExerciseForJudge_IncludesAll(t *testing.T) {
-	db := setupTestDB(t)
+	db, exID := setupTestDB(t)
 	defer db.Close()
 
 	repo := NewRepository(db)
 	svc := NewService(repo)
 
-	judgeEx, err := svc.GetExerciseForJudge(1)
+	judgeEx, err := svc.GetExerciseForJudge(exID)
 	if err != nil {
 		t.Fatalf("GetExerciseForJudge thất bại: %v", err)
 	}
