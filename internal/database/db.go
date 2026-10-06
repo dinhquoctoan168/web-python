@@ -43,8 +43,8 @@ func InitDB(dbPath string) (*sql.DB, error) {
 			return
 		}
 
-		if err = initSchema(dbInstance); err != nil {
-			err = fmt.Errorf("khởi tạo schema thất bại: %w", err)
+		if err = RunMigrations(dbInstance); err != nil {
+			err = fmt.Errorf("chạy migrations thất bại: %w", err)
 			return
 		}
 
