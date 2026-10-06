@@ -19,9 +19,10 @@ type Exercise struct {
 	Difficulty       string   `json:"difficulty"`
 	Description      string   `json:"description"`
 	InitialCode      string   `json:"initial_code"`
-	AllowedFunctions []string `json:"allowed_functions"`
-	TestCasesJSON    string   `json:"test_cases_json"`
-	SolutionHint     string   `json:"solution_hint"`
+	AllowedFunctions  []string `json:"allowed_functions"`
+	TestCasesJSON     string   `json:"test_cases_json"`
+	SolutionHint      string   `json:"solution_hint"`
+	VisualizationType string   `json:"visualization_type,omitempty"`
 }
 
 // Topic đại diện cho 1 chủ đề
@@ -63,7 +64,7 @@ func GetTopicsWithExercises() ([]Topic, error) {
 	}
 
 	for i := range topics {
-		exRows, err := db.Query(`SELECT id, topic_id, title, difficulty, description, initial_code, allowed_functions, COALESCE(solution_hint, '') 
+		exRows, err := db.Query(`SELECT id, topic_id, title, difficulty, description, initial_code, allowed_functions, COALESCE(solution_hint, ''), COALESCE(visualization_type, '') 
 			FROM exercises WHERE topic_id = ? ORDER BY id ASC`, topics[i].ID)
 		if err != nil {
 			return nil, err
@@ -73,7 +74,7 @@ func GetTopicsWithExercises() ([]Topic, error) {
 		for exRows.Next() {
 			var ex Exercise
 			var allowedFuncsRaw string
-			if err := exRows.Scan(&ex.ID, &ex.TopicID, &ex.Title, &ex.Difficulty, &ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint); err != nil {
+			if err := exRows.Scan(&ex.ID, &ex.TopicID, &ex.Title, &ex.Difficulty, &ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint, &ex.VisualizationType); err != nil {
 				exRows.Close()
 				return nil, err
 			}
@@ -119,14 +120,14 @@ func GetExerciseByID(id int) (*Exercise, error) {
 	var allowedFuncsRaw string
 
 	query := `SELECT e.id, e.topic_id, COALESCE(t.name, ''), e.title, e.difficulty, e.description, e.initial_code, 
-		COALESCE(e.allowed_functions, '[]'), COALESCE(e.solution_hint, '') 
+		COALESCE(e.allowed_functions, '[]'), COALESCE(e.solution_hint, ''), COALESCE(e.visualization_type, '') 
 		FROM exercises e 
 		LEFT JOIN topics t ON e.topic_id = t.id 
 		WHERE e.id = ?`
 
 	err := db.QueryRow(query, id).Scan(
 		&ex.ID, &ex.TopicID, &ex.TopicName, &ex.Title, &ex.Difficulty,
-		&ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint,
+		&ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint, &ex.VisualizationType,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/ide.css">
+    <link rel="stylesheet" href="/static/css/visualization.css">
     <!-- Python Execution Runtime -->
     <script src="/static/js/skulpt.min.js"></script>
     <script src="/static/js/skulpt-stdlib.js"></script>
@@ -15,6 +16,11 @@
 <body class="ide-theme-dark">
     {{ block "content" . }}{{ end }}
     <script src="/static/js/engine.js"></script>
+    <script src="/static/js/visualization/binary-search.js"></script>
+    <script src="/static/js/visualization/array.js"></script>
+    <script src="/static/js/visualization/stack.js"></script>
+    <script src="/static/js/visualization/sorting.js"></script>
+    <script src="/static/js/visualization/manager.js"></script>
     <script src="/static/js/ide.js"></script>
 </body>
 </html>

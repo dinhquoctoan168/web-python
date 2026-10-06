@@ -61,10 +61,11 @@ func (s *Service) GetExerciseForClient(id int) (*ClientExerciseDetail, error) {
 		Description:      ex.Description,
 		InitialCode:      ex.InitialCode,
 		SolutionHint:     ex.SolutionHint,
-		AllowedFunctions: ex.AllowedFunctions,
-		TimeLimitMS:      ex.TimeLimitMS,
-		TestCases:        publicTCs,
-		TestCasesJSON:    string(tcsJSON),
+		AllowedFunctions:  ex.AllowedFunctions,
+		TimeLimitMS:       ex.TimeLimitMS,
+		VisualizationType: ex.VisualizationType,
+		TestCases:         publicTCs,
+		TestCasesJSON:     string(tcsJSON),
 	}, nil
 }
 

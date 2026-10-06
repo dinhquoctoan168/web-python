@@ -513,6 +513,22 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 13,
+		Name:    "visualization_type",
+		Up: func(tx *sql.Tx) error {
+			alterQuery := `ALTER TABLE exercises ADD COLUMN visualization_type TEXT DEFAULT '';`
+			if _, err := tx.Exec(alterQuery); err != nil {
+				return err
+			}
+			// Gán mẫu cho một số bài tập nếu tiêu đề chứa thuật toán tương ứng
+			_, _ = tx.Exec(`UPDATE exercises SET visualization_type = 'binary_search' WHERE title LIKE '%nhị phân%' OR title LIKE '%Binary Search%'`)
+			_, _ = tx.Exec(`UPDATE exercises SET visualization_type = 'sorting' WHERE title LIKE '%sắp xếp%' OR title LIKE '%Sort%'`)
+			_, _ = tx.Exec(`UPDATE exercises SET visualization_type = 'stack' WHERE title LIKE '%ngăn xếp%' OR title LIKE '%Stack%'`)
+			_, _ = tx.Exec(`UPDATE exercises SET visualization_type = 'array' WHERE title LIKE '%mảng%' OR title LIKE '%Array%' OR title LIKE '%danh sách%'`)
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

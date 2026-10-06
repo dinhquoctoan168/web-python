@@ -39,30 +39,32 @@ type Exercise struct {
 	InitialCode      string     `json:"initial_code"`
 	SolutionCode     string     `json:"solution_code,omitempty"`
 	SolutionHint     string     `json:"solution_hint,omitempty"`
-	AllowedFunctions []string   `json:"allowed_functions"`
-	TimeLimitMS      int        `json:"time_limit_ms"`
-	Status           string     `json:"status"`
-	CreatedBy        *int       `json:"created_by,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
-	TestCases        []TestCase `json:"test_cases,omitempty"`
+	AllowedFunctions  []string   `json:"allowed_functions"`
+	TimeLimitMS       int        `json:"time_limit_ms"`
+	VisualizationType string     `json:"visualization_type,omitempty"`
+	Status            string     `json:"status"`
+	CreatedBy         *int       `json:"created_by,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	TestCases         []TestCase `json:"test_cases,omitempty"`
 }
 
 // ClientExerciseDetail là định dạng trả về an toàn cho client qua /api/exercise hoặc IDE
 // Tuyệt đối không chứa SolutionCode hoặc Hidden Test Cases
 type ClientExerciseDetail struct {
-	ID               int              `json:"id"`
-	CourseID         int              `json:"course_id"`
-	LessonID         *int             `json:"lesson_id,omitempty"`
-	TopicID          *int             `json:"topic_id,omitempty"`
-	TopicName        string           `json:"topic_name,omitempty"`
-	Title            string           `json:"title"`
-	ExerciseType     string           `json:"exercise_type"`
-	Difficulty       string           `json:"difficulty"`
-	Description      string           `json:"description"`
-	InitialCode      string           `json:"initial_code"`
-	SolutionHint     string           `json:"solution_hint,omitempty"`
-	AllowedFunctions []string         `json:"allowed_functions"`
-	TimeLimitMS      int              `json:"time_limit_ms"`
-	TestCases        []PublicTestCase `json:"test_cases"`
-	TestCasesJSON    string           `json:"test_cases_json"`
+	ID                int              `json:"id"`
+	CourseID          int              `json:"course_id"`
+	LessonID          *int             `json:"lesson_id,omitempty"`
+	TopicID           *int             `json:"topic_id,omitempty"`
+	TopicName         string           `json:"topic_name,omitempty"`
+	Title             string           `json:"title"`
+	ExerciseType      string           `json:"exercise_type"`
+	Difficulty        string           `json:"difficulty"`
+	Description       string           `json:"description"`
+	InitialCode       string           `json:"initial_code"`
+	SolutionHint      string           `json:"solution_hint,omitempty"`
+	AllowedFunctions  []string         `json:"allowed_functions"`
+	TimeLimitMS       int              `json:"time_limit_ms"`
+	VisualizationType string           `json:"visualization_type,omitempty"`
+	TestCases         []PublicTestCase `json:"test_cases"`
+	TestCasesJSON     string           `json:"test_cases_json"`
 }

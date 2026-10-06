@@ -482,6 +482,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Nạp bản nháp đã lưu của học viên từ server (nếu có)
         loadSavedDraft(ex.id);
+
+        // Phase 17: Xử lý mô phỏng trực quan thuật toán (Algorithm Visualization)
+        if (window.VisualizationManager) {
+            window.VisualizationManager.load(ex);
+        }
     };
 
     // Phase 13: Tải các lựa chọn trắc nghiệm từ API bảo mật (tuyệt đối không lộ đáp án đúng)

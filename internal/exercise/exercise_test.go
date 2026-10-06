@@ -116,3 +116,28 @@ func TestGetExerciseForJudge_IncludesAll(t *testing.T) {
 		t.Fatalf("Judge phải có solution_code để đối chiếu")
 	}
 }
+
+func TestVisualizationTypeField(t *testing.T) {
+	db, _ := setupTestDB(t)
+	defer db.Close()
+
+	// Thêm bài tập có visualization_type
+	res, err := db.Exec(`INSERT INTO exercises 
+		(course_id, topic_id, title, difficulty, description, initial_code, visualization_type) 
+		VALUES (3, 1, 'Thuật toán Binary Search', 'Trung bình', 'Tìm kiếm nhị phân', 'def binary_search(arr, x): pass', 'binary_search')`)
+	if err != nil {
+		t.Fatalf("Lỗi tạo bài tập visualization: %v", err)
+	}
+	exID, _ := res.LastInsertId()
+
+	repo := NewRepository(db)
+	svc := NewService(repo)
+
+	clientEx, err := svc.GetExerciseForClient(int(exID))
+	if err != nil {
+		t.Fatalf("Lỗi GetExerciseForClient: %v", err)
+	}
+	if clientEx == nil || clientEx.VisualizationType != "binary_search" {
+		t.Fatalf("Kỳ vọng VisualizationType = 'binary_search', nhận được: %v", clientEx.VisualizationType)
+	}
+}

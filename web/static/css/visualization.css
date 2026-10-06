@@ -1,0 +1,343 @@
+/* ==========================================================================
+   ALGORITHM VISUALIZATION CSS (Zero-framework, Vanilla CSS)
+   Hỗ trợ mô phỏng trực quan: Binary Search, Array, Stack, Sorting
+   ========================================================================== */
+
+.visualization-section {
+    background: var(--bg-card, #1e1e2e);
+    border: 1px solid var(--border-color, #313244);
+    border-radius: 8px;
+    margin: 12px 16px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.viz-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.viz-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color, #313244);
+}
+
+.viz-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.viz-badge {
+    background: rgba(137, 180, 250, 0.15);
+    color: var(--accent-blue, #89b4fa);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.viz-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary, #cdd6f4);
+}
+
+.viz-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.viz-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.viz-btn-primary {
+    background: var(--accent-green, #a6e3a1);
+    color: #11111b;
+}
+
+.viz-btn-primary:hover {
+    background: #94e2d5;
+}
+
+.viz-btn-secondary {
+    background: var(--bg-secondary, #181825);
+    color: var(--text-primary, #cdd6f4);
+    border-color: var(--border-color, #313244);
+}
+
+.viz-btn-secondary:hover:not(:disabled) {
+    background: #313244;
+}
+
+.viz-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.viz-step-counter {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted, #a6adc8);
+    padding: 0 4px;
+}
+
+/* Khung hiển thị mô phỏng sân khấu (Stage) */
+.viz-stage {
+    min-height: 140px;
+    background: var(--bg-primary, #11111b);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow-x: auto;
+}
+
+/* Thông điệp giải thích từng bước */
+.viz-explanation-box {
+    background: rgba(137, 180, 250, 0.08);
+    border-left: 3px solid var(--accent-blue, #89b4fa);
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-primary, #cdd6f4);
+    font-family: inherit;
+}
+
+.viz-explanation-box strong {
+    color: var(--accent-amber, #f9e2af);
+}
+
+/* ==========================================
+   MÔ PHỎNG MẢNG & BINARY SEARCH
+   ========================================== */
+
+.viz-array-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.viz-target-chip {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    background: rgba(249, 226, 175, 0.15);
+    color: var(--accent-amber, #f9e2af);
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+
+.viz-array-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 20px 8px 10px 8px;
+    position: relative;
+}
+
+.viz-cell-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+}
+
+.viz-cell {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    border: 2px solid var(--border-color, #45475a);
+    border-radius: 8px;
+    background: var(--bg-card, #1e1e2e);
+    color: var(--text-primary, #cdd6f4);
+    transition: all 0.25s ease;
+}
+
+.viz-cell.active-range {
+    border-color: var(--accent-blue, #89b4fa);
+    background: rgba(137, 180, 250, 0.12);
+}
+
+.viz-cell.mid-cell {
+    border-color: var(--accent-amber, #f9e2af);
+    background: rgba(249, 226, 175, 0.22);
+    color: #f9e2af;
+    transform: scale(1.08);
+}
+
+.viz-cell.found-cell {
+    border-color: var(--accent-green, #a6e3a1);
+    background: rgba(166, 227, 161, 0.3);
+    color: #a6e3a1;
+    transform: scale(1.12);
+    box-shadow: 0 0 14px rgba(166, 227, 161, 0.4);
+}
+
+.viz-cell.eliminated-cell {
+    opacity: 0.25;
+    background: #181825;
+    border-color: #313244;
+}
+
+.viz-cell-index {
+    font-size: 11px;
+    color: var(--text-muted, #6c7086);
+    font-family: monospace;
+}
+
+/* Con trỏ con trỏ (L, R, M) */
+.viz-pointer-label {
+    position: absolute;
+    top: -20px;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    line-height: 1.2;
+    z-index: 2;
+}
+
+.viz-ptr-left {
+    background: #89b4fa;
+    color: #11111b;
+}
+
+.viz-ptr-mid {
+    background: #f9e2af;
+    color: #11111b;
+}
+
+.viz-ptr-right {
+    background: #f38ba8;
+    color: #11111b;
+}
+
+/* ==========================================
+   MÔ PHỎNG NGĂN XẾP (STACK)
+   ========================================== */
+
+.viz-stack-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.viz-stack-column {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
+    min-width: 120px;
+    min-height: 150px;
+    border-left: 3px solid var(--border-color, #45475a);
+    border-right: 3px solid var(--border-color, #45475a);
+    border-bottom: 4px solid var(--accent-blue, #89b4fa);
+    padding: 8px 8px 4px 8px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 0 0 4px 4px;
+}
+
+.viz-stack-item {
+    background: var(--bg-card, #1e1e2e);
+    border: 1px solid var(--accent-blue, #89b4fa);
+    border-radius: 4px;
+    padding: 8px 16px;
+    text-align: center;
+    font-weight: 700;
+    font-family: monospace;
+    color: var(--text-primary, #cdd6f4);
+    animation: stackSlideDown 0.25s ease-out;
+}
+
+.viz-stack-item.top-item {
+    border-color: var(--accent-amber, #f9e2af);
+    background: rgba(249, 226, 175, 0.15);
+    color: var(--accent-amber, #f9e2af);
+}
+
+@keyframes stackSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================
+   MÔ PHỎNG SẮP XẾP (SORTING)
+   ========================================== */
+
+.viz-sort-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 120px;
+    padding: 0 10px;
+}
+
+.viz-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.viz-bar {
+    width: 32px;
+    background: var(--accent-blue, #89b4fa);
+    border-radius: 4px 4px 0 0;
+    transition: height 0.3s ease, background 0.25s ease;
+}
+
+.viz-bar.comparing {
+    background: var(--accent-amber, #f9e2af);
+}
+
+.viz-bar.sorted {
+    background: var(--accent-green, #a6e3a1);
+}
+
+.viz-bar-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary, #cdd6f4);
+    font-family: monospace;
+}
