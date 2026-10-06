@@ -17,6 +17,7 @@ import (
 	"web_python/internal/auth"
 	"web_python/internal/class"
 	"web_python/internal/course"
+	"web_python/internal/dashboard"
 	"web_python/internal/database"
 	"web_python/internal/exam"
 	"web_python/internal/exercise"
@@ -128,6 +129,10 @@ func main() {
 	quizService := quiz.NewService(quizRepo, practiceService, submissionService)
 	quizHandler := quiz.NewHandler(quizService)
 
+	dashboardRepo := dashboard.NewRepository(db)
+	dashboardService := dashboard.NewService(dashboardRepo)
+	dashboardHandler := dashboard.NewHandler(dashboardService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -152,6 +157,7 @@ func main() {
 	mux.HandleFunc("/api/me", authHandler.HandleCurrentUser)
 
 	// Tuyến đường môn học, bài học & thi cử (Sinh viên)
+	mux.HandleFunc("/dashboard", auth.RequireLogin(dashboardHandler.HandleStudentDashboard))
 	mux.HandleFunc("/courses", auth.RequireLogin(courseHandler.HandleListCourses))
 	mux.HandleFunc("/course", auth.RequireLogin(courseHandler.HandleCourseDetail))
 	mux.HandleFunc("/lesson", auth.RequireLogin(lessonHandler.HandleStudentLesson))
@@ -203,8 +209,13 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
-		if user := auth.GetUser(r.Context()); user == nil {
+		user := auth.GetUser(r.Context())
+		if user == nil {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if user.Role == "student" {
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return
 		}
 		http.Redirect(w, r, "/courses", http.StatusSeeOther)

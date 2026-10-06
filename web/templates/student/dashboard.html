@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/dashboard" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/dashboard" class="active">Tổng quan</a>
+            <a href="/courses">Môn học</a>
+            <a href="/my-classes">Lớp học của tôi</a>
+            <a href="/my-assignments">Bài tập</a>
+            <a href="/student/exams">Ca thi</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Chào mừng học viên -->
+        <div class="welcome-banner">
+            <div>
+                <h1 class="welcome-title">Xin chào, {{ if .User }}{{ .User.FullName }}{{ else }}Học viên{{ end }}! &#128075;</h1>
+                <p class="welcome-subtitle">Chào mừng bạn quay trở lại. Hãy cùng tiếp tục hoàn thành các mục tiêu rèn luyện lập trình hôm nay.</p>
+            </div>
+            <div>
+                <a href="/ide" class="btn btn-primary" style="padding: 10px 18px; font-size: 14px;">
+                    <span>&#9658;</span> Mở IDE Luyện tập
+                </a>
+            </div>
+        </div>
+
+        <!-- Section 1: Tiến độ các môn học đang tham gia -->
+        <section class="dashboard-section">
+            <div class="section-header">
+                <h2>&#128218; Môn học & Tiến độ của bạn</h2>
+                <a href="/my-classes" class="section-link">Xem tất cả lớp học &rarr;</a>
+            </div>
+
+            <div class="courses-grid">
+                {{ range .Courses }}
+                <div class="course-progress-card">
+                    <div class="course-meta">
+                        <span class="course-code">{{ .CourseCode }}</span>
+                        <span class="progress-badge">{{ .ProgressPercent }}%</span>
+                    </div>
+                    <h3 class="course-title">{{ .CourseName }}</h3>
+                    
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: {{ .ProgressPercent }}%;"></div>
+                    </div>
+                    
+                    <div class="course-stats">
+                        <span>Đã làm: <strong>{{ .CompletedExercises }}</strong> / {{ .TotalExercises }} bài</span>
+                        <span>Tiến độ: <strong>{{ .ProgressPercent }}%</strong></span>
+                    </div>
+
+                    <div class="course-action">
+                        <a href="/course?id={{ .CourseID }}" class="btn btn-secondary btn-block">Vào môn học &rarr;</a>
+                    </div>
+                </div>
+                {{ else }}
+                <div class="empty-card">
+                    <p>Bạn chưa được ghi danh vào môn học nào.</p>
+                    <a href="/courses" class="btn btn-primary" style="margin-top: 10px;">Khám phá danh sách môn học</a>
+                </div>
+                {{ end }}
+            </div>
+        </section>
+
+        <!-- Section 2: Hai cột - Việc cần làm & Kết quả gần đây -->
+        <div class="dashboard-two-cols">
+            <!-- Cột trái: Upcoming Deadlines -->
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2>&#9200; Sắp đến hạn (Upcoming)</h2>
+                </div>
+
+                <div class="upcoming-list">
+                    {{ range .Upcoming }}
+                    <div class="upcoming-item">
+                        <div class="upcoming-type">
+                            {{ if eq .Type "assignment" }}
+                            <span class="type-badge badge-assignment">Bài tập</span>
+                            {{ else }}
+                            <span class="type-badge badge-exam">Ca thi</span>
+                            {{ end }}
+                        </div>
+                        <div class="upcoming-content">
+                            <h4 class="upcoming-title">{{ .Title }}</h4>
+                            <p class="upcoming-sub">{{ .CourseName }} &bull; {{ .ClassName }}</p>
+                            <p class="upcoming-deadline">&#9200; Hạn chót: <strong>{{ .Deadline }}</strong></p>
+                        </div>
+                        <div class="upcoming-btn">
+                            <a href="{{ .Link }}" class="btn btn-sm btn-primary">Làm ngay</a>
+                        </div>
+                    </div>
+                    {{ else }}
+                    <div class="empty-card">
+                        <p>Tuyệt vời! Hiện không có bài tập hoặc ca thi nào sắp đến hạn.</p>
+                    </div>
+                    {{ end }}
+                </div>
+            </section>
+
+            <!-- Cột phải: Recent Results -->
+            <section class="dashboard-section">
+                <div class="section-header">
+                    <h2>&#128202; Kết quả gần đây (Recent Results)</h2>
+                </div>
+
+                <div class="results-table-container">
+                    {{ if .RecentSubmissions }}
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Bài tập</th>
+                                <th style="text-align: center;">Điểm số</th>
+                                <th>Thời gian</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{ range .RecentSubmissions }}
+                            <tr>
+                                <td class="result-exercise-title">
+                                    <strong>{{ .ExerciseTitle }}</strong>
+                                </td>
+                                <td style="text-align: center;">
+                                    <span class="score-badge {{ if ge .Score 100.0 }}score-full{{ else if ge .Score 50.0 }}score-mid{{ else }}score-low{{ end }}">
+                                        {{ printf "%.0f" .Score }}/100
+                                    </span>
+                                </td>
+                                <td class="result-time">{{ .SubmittedAt }}</td>
+                                <td>
+                                    <a href="/ide" class="btn btn-sm btn-secondary">Xem lại</a>
+                                </td>
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
+                    {{ else }}
+                    <div class="empty-card">
+                        <p>Chưa có lịch sử nộp bài nào gần đây.</p>
+                    </div>
+                    {{ end }}
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

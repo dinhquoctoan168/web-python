@@ -28,7 +28,7 @@ func (h *Handler) ShowLoginPage(w http.ResponseWriter, r *http.Request) {
 		if user.Role == RoleTeacher || user.Role == RoleAdmin {
 			http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
 		} else {
-			http.Redirect(w, r, "/courses", http.StatusSeeOther)
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		}
 		return
 	}
@@ -76,7 +76,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if user.Role == RoleTeacher || user.Role == RoleAdmin {
 		http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
 	} else {
-		http.Redirect(w, r, "/courses", http.StatusSeeOther)
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 	}
 }
 
