@@ -160,6 +160,35 @@ body {
     border: 1px solid var(--border-subtle);
 }
 
+.save-status {
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    margin-left: 8px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.save-status.saved {
+    color: #4ec9b0;
+    background-color: rgba(78, 201, 176, 0.1);
+    border: 1px solid rgba(78, 201, 176, 0.2);
+}
+
+.save-status.saving {
+    color: #e5c07b;
+    background-color: rgba(229, 192, 123, 0.1);
+    border: 1px solid rgba(229, 192, 123, 0.2);
+}
+
+.save-status.error {
+    color: #f44747;
+    background-color: rgba(244, 71, 71, 0.1);
+    border: 1px solid rgba(244, 71, 71, 0.2);
+}
+
 .header-right {
     display: flex;
     align-items: center;
@@ -433,8 +462,24 @@ body.is-resizing * {
 }
 
 .ex-bullet {
-    font-size: 10px;
-    color: var(--accent-blue);
+    font-size: 13px;
+    width: 14px;
+    text-align: center;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.ex-bullet.status-completed {
+    color: #4ec9b0;
+    font-weight: bold;
+}
+
+.ex-bullet.status-inprogress {
+    color: #e5c07b;
+}
+
+.ex-bullet.status-notstarted {
+    color: #6a737d;
 }
 
 .ex-name {

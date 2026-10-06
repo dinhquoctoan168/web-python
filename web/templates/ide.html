@@ -17,6 +17,7 @@
 
         <div class="header-center">
             <span class="env-tag">Python 3.12</span>
+            <span id="saveStatus" class="save-status saved" title="Tự động lưu mã nguồn">&#10003; Đã lưu</span>
             <div id="examModeContainer" class="exam-status-box" style="display: none;">
                 <span class="exam-badge">&#9201; CHẾ ĐỘ THI</span>
                 <span id="examTimer" class="exam-timer">45:00</span>
@@ -69,7 +70,7 @@
                                 data-id="{{ .ID }}" 
                                 id="exercise-item-{{ .ID }}">
                                 <div class="exercise-item-header" onclick="loadExercise({{ .ID }})">
-                                    <span class="ex-bullet">&#9679;</span>
+                                    <span class="ex-bullet status-notstarted" id="exBullet-{{ .ID }}" title="Chưa làm">&#9675;</span>
                                     <span class="ex-name">{{ .Title }}</span>
                                     <span class="badge-mini badge-{{ .Difficulty }}">{{ .Difficulty }}</span>
                                     <button class="btn-toggle-problem" type="button" title="Ẩn / Hiện đề bài" onclick="toggleProblemDrawer(event, {{ .ID }})">

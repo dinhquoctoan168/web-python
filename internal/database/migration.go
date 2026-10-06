@@ -291,6 +291,29 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 7,
+		Name:    "practice",
+		Up: func(tx *sql.Tx) error {
+			query := `CREATE TABLE IF NOT EXISTS student_exercise_progress (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				student_id INTEGER NOT NULL,
+				exercise_id INTEGER NOT NULL,
+				status TEXT NOT NULL DEFAULT 'not_started',
+				last_code TEXT,
+				best_score REAL DEFAULT 0,
+				attempts INTEGER DEFAULT 0,
+				first_started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				completed_at DATETIME,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY(student_id) REFERENCES users(id),
+				FOREIGN KEY(exercise_id) REFERENCES exercises(id),
+				UNIQUE(student_id, exercise_id)
+			);`
+			_, err := tx.Exec(query)
+			return err
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

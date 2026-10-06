@@ -20,6 +20,7 @@ import (
 	"web_python/internal/exercise"
 	"web_python/internal/frontend"
 	"web_python/internal/lesson"
+	"web_python/internal/practice"
 )
 
 // loadEnv đọc tệp cấu hình .env thủ công bằng standard library để không phụ thuộc lib ngoài
@@ -98,6 +99,10 @@ func main() {
 	exerciseService := exercise.NewService(exerciseRepo)
 	exerciseHandler := exercise.NewHandler(exerciseService)
 
+	practiceRepo := practice.NewRepository(db)
+	practiceService := practice.NewService(practiceRepo)
+	practiceHandler := practice.NewHandler(practiceService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -165,6 +170,10 @@ func main() {
 	// API endpoints
 	mux.HandleFunc("/api/exercise", exerciseHandler.HandleAPIExercise)
 	mux.HandleFunc("/api/functions", frontend.HandleAPIFunctions)
+	mux.HandleFunc("/api/practice/save", practiceHandler.HandleSaveDraft)
+	mux.HandleFunc("/api/practice/submit", practiceHandler.HandleSubmitPractice)
+	mux.HandleFunc("/api/practice/state", practiceHandler.HandleGetState)
+	mux.HandleFunc("/api/practice/all-states", practiceHandler.HandleGetAllStates)
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware
 	rootHandler := authMiddleware.AuthenticateMiddleware(mux)

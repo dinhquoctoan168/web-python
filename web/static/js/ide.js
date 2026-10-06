@@ -35,10 +35,147 @@ document.addEventListener('DOMContentLoaded', function() {
     const examSuspendedOverlay = document.getElementById('examSuspendedOverlay');
     const suspendedReason = document.getElementById('suspendedReason');
     const suspendedTime = document.getElementById('suspendedTime');
+    const saveStatus = document.getElementById('saveStatus');
 
     function escapeHtml(text) {
         if (!text) return '';
         return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // --- Quản lý tiến độ luyện tập & Tự động lưu (Phase 7: Student Practice) ---
+    function setSaveStatus(state) {
+        if (!saveStatus) return;
+        saveStatus.className = `save-status ${state}`;
+        if (state === 'saving') {
+            saveStatus.innerHTML = '&#8635; Đang lưu...';
+        } else if (state === 'error') {
+            saveStatus.innerHTML = '&#9888; Lỗi lưu';
+        } else {
+            saveStatus.innerHTML = '&#10003; Đã lưu';
+        }
+    }
+
+    let autoSaveTimer = null;
+    function triggerAutoSave() {
+        if (!currentExercise) return;
+        setSaveStatus('saving');
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function() {
+            saveDraftCode(currentExercise.id, codeEditor.value);
+        }, 2500); // 2.5 giây debounce
+    }
+
+    function saveDraftCode(exerciseId, code) {
+        fetch('/api/practice/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exercise_id: exerciseId, code: code })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            setSaveStatus('saved');
+            if (data && data.status) {
+                updateExerciseBullet(exerciseId, data.status);
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi tự động lưu:', err);
+            setSaveStatus('error');
+        });
+    }
+
+    function updateExerciseBullet(exerciseId, status) {
+        const bullet = document.getElementById(`exBullet-${exerciseId}`);
+        if (!bullet) return;
+
+        bullet.classList.remove('status-completed', 'status-inprogress', 'status-notstarted');
+        if (status === 'completed') {
+            bullet.classList.add('status-completed');
+            bullet.innerHTML = '&#10003;'; // ✓
+            bullet.title = 'Đã hoàn thành';
+        } else if (status === 'in_progress') {
+            bullet.classList.add('status-inprogress');
+            bullet.innerHTML = '&#9679;'; // ●
+            bullet.title = 'Đang làm';
+        } else {
+            bullet.classList.add('status-notstarted');
+            bullet.innerHTML = '&#9675;'; // ○
+            bullet.title = 'Chưa làm';
+        }
+    }
+
+    function loadAllProgressStates() {
+        fetch('/api/practice/all-states')
+            .then(res => {
+                if (!res.ok) return [];
+                return res.json();
+            })
+            .then(states => {
+                if (Array.isArray(states)) {
+                    states.forEach(st => {
+                        updateExerciseBullet(st.exercise_id, st.status);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error('Lỗi nạp trạng thái tiến độ:', err);
+            });
+    }
+
+    function loadSavedDraft(exerciseId) {
+        fetch(`/api/practice/state?exercise_id=${exerciseId}`)
+            .then(res => {
+                if (!res.ok) return null;
+                return res.json();
+            })
+            .then(state => {
+                if (state && state.last_code && state.last_code.trim() !== '') {
+                    codeEditor.value = state.last_code;
+                    updateLineNumbers();
+                    updateHighlighting();
+                    const initial = currentExercise.initialCode || currentExercise.initial_code || '';
+                    if (state.last_code !== initial) {
+                        dirtyIndicator.style.display = 'inline';
+                    } else {
+                        dirtyIndicator.style.display = 'none';
+                    }
+                }
+                if (state && state.status) {
+                    updateExerciseBullet(exerciseId, state.status);
+                }
+                setSaveStatus('saved');
+            })
+            .catch(err => {
+                console.error('Lỗi lấy tiến độ bài tập:', err);
+            });
+    }
+
+    function submitPracticeResult(exerciseId, code, score, passed) {
+        fetch('/api/practice/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                exercise_id: exerciseId,
+                code: code,
+                score: score,
+                passed: passed
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (data && data.status) {
+                updateExerciseBullet(exerciseId, data.status);
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi ghi nhận kết quả bài tập:', err);
+        });
     }
 
     // Bộ phân tích cú pháp và tô màu mã Python (Python Syntax Highlighter)
@@ -106,6 +243,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             dirtyIndicator.style.display = 'none';
         }
+        triggerAutoSave();
     });
 
     codeEditor.addEventListener('scroll', function() {
@@ -126,6 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.selectionStart = this.selectionEnd = start + 4;
             updateLineNumbers();
             updateHighlighting();
+            triggerAutoSave();
         } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             runCode();
@@ -145,6 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.selectionStart = this.selectionEnd = start + 1 + indent.length;
                 updateLineNumbers();
                 updateHighlighting();
+                triggerAutoSave();
             }
         }
     });
@@ -271,6 +411,9 @@ document.addEventListener('DOMContentLoaded', function() {
         dirtyIndicator.style.display = 'none';
         updateLineNumbers();
         updateHighlighting();
+
+        // Nạp bản nháp đã lưu của học viên từ server (nếu có)
+        loadSavedDraft(ex.id);
     };
 
     // Chuyển đổi trạng thái Ẩn/Hiện đề bài nội tuyến
@@ -407,6 +550,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="tc-detail"><strong>Thực tế trả về:</strong> <code class="${r.passed ? 'tc-pass' : 'tc-fail'}">${escapeHtml(r.actual)}</code></div>
                     </div>
                 `).join('');
+
+                // Ghi nhận kết quả luyện tập vào cơ sở dữ liệu (Phase 7: Student Practice)
+                if (currentExercise && totalCount > 0) {
+                    const passed = (passCount === totalCount);
+                    const score = (passCount / totalCount) * 100;
+                    submitPracticeResult(currentExercise.id, code, score, passed);
+                }
             }
         );
     }
@@ -418,10 +568,12 @@ document.addEventListener('DOMContentLoaded', function() {
     btnResetCode.addEventListener('click', function() {
         if (currentExercise) {
             if (confirm("Bạn có chắc chắn muốn đặt lại mã nguồn về trạng thái ban đầu?")) {
-                codeEditor.value = currentExercise.initialCode || currentExercise.initial_code || '';
+                const initial = currentExercise.initialCode || currentExercise.initial_code || '';
+                codeEditor.value = initial;
                 updateLineNumbers();
                 updateHighlighting();
                 dirtyIndicator.style.display = 'none';
+                saveDraftCode(currentExercise.id, initial);
             }
         }
     });
@@ -750,4 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
         renderExerciseDetails(window.INITIAL_EXERCISE);
     }
     updateLineNumbers();
+
+    // Tải toàn bộ trạng thái tiến độ luyện tập cho Sidebar (Phase 7)
+    loadAllProgressStates();
 });
