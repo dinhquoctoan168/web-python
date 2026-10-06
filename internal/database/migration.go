@@ -353,6 +353,42 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 9,
+		Name:    "assignments",
+		Up: func(tx *sql.Tx) error {
+			queries := []string{
+				`CREATE TABLE IF NOT EXISTS assignments (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					class_id INTEGER NOT NULL,
+					title TEXT NOT NULL,
+					description TEXT,
+					start_at DATETIME,
+					due_at DATETIME,
+					status TEXT DEFAULT 'draft',
+					created_by INTEGER,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY(class_id) REFERENCES classes(id),
+					FOREIGN KEY(created_by) REFERENCES users(id)
+				);`,
+				`CREATE TABLE IF NOT EXISTS assignment_exercises (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					assignment_id INTEGER NOT NULL,
+					exercise_id INTEGER NOT NULL,
+					points REAL DEFAULT 1,
+					order_num INTEGER DEFAULT 0,
+					FOREIGN KEY(assignment_id) REFERENCES assignments(id),
+					FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+				);`,
+			}
+			for _, q := range queries {
+				if _, err := tx.Exec(q); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

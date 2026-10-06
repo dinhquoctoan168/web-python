@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+    <style>
+        .form-card {
+            background-color: var(--bg-card, #252526);
+            border: 1px solid var(--border-color, #333333);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-main, #cccccc);
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: var(--bg-input, #3c3c3c);
+            border: 1px solid var(--border-color, #333333);
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-blue, #61afef);
+        }
+        .exercise-picker-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .exercise-picker-table th, .exercise-picker-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color, #333333);
+            text-align: left;
+        }
+        .exercise-picker-table th {
+            background-color: rgba(255, 255, 255, 0.03);
+            color: var(--text-muted, #858585);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .point-input {
+            width: 80px;
+            padding: 6px 8px;
+            background-color: var(--bg-input, #3c3c3c);
+            border: 1px solid var(--border-color, #333333);
+            border-radius: 4px;
+            color: #fff;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses">Quản lý Môn</a>
+            <a href="/teacher/classes">Quản lý Lớp</a>
+            <a href="/teacher/assignments" class="active">Giao bài tập</a>
+            <a href="/teacher/submissions">Lịch sử nộp bài</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="/teacher/assignments" style="color: var(--accent-blue, #61afef); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách bài tập</a>
+        </div>
+
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Giao bài tập mới cho Lớp học</h1>
+                <p class="page-subtitle">Chọn lớp học, đặt thời hạn và lựa chọn các câu hỏi từ ngân hàng bài tập.</p>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <form action="/teacher/assignment/create" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="class_id">Lớp học tiếp nhận *</label>
+                        <select id="class_id" name="class_id" class="form-control" required>
+                            <option value="">-- Chọn lớp học --</option>
+                            {{ range .Classes }}
+                            <option value="{{ .ID }}">{{ .Name }} ({{ .CourseCode }} - {{ .CourseName }})</option>
+                            {{ end }}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="title">Tiêu đề đợt bài tập *</label>
+                        <input type="text" id="title" name="title" class="form-control" placeholder="Ví dụ: Bài tập tuần 3 - Cấu trúc rẽ nhánh & Vòng lặp" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Mô tả / Hướng dẫn làm bài</label>
+                    <textarea id="description" name="description" class="form-control" rows="3" placeholder="Ghi chú yêu cầu hoàn thành, quy định trừ điểm nếu nộp trễ..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="start_at">Thời gian mở</label>
+                        <input type="datetime-local" id="start_at" name="start_at" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="due_at">Hạn chót nộp bài</label>
+                        <input type="datetime-local" id="due_at" name="due_at" class="form-control">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <label style="font-size: 16px; font-weight: 600; color: #fff;">Chọn câu hỏi từ Ngân hàng bài tập *</label>
+                    <p style="font-size: 13px; color: var(--text-muted, #858585); margin-top: 4px;">Tick chọn câu hỏi và nhập điểm số tương ứng cho mỗi câu.</p>
+
+                    <div style="max-height: 420px; overflow-y: auto; border: 1px solid var(--border-color, #333); border-radius: 6px; margin-top: 10px;">
+                        <table class="exercise-picker-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px; text-align: center;">Chọn</th>
+                                    <th style="width: 60px;">ID</th>
+                                    <th>Tên bài tập</th>
+                                    <th style="width: 140px;">Chủ đề</th>
+                                    <th style="width: 90px; text-align: center;">Độ khó</th>
+                                    <th style="width: 110px; text-align: center;">Điểm số</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{ range .Exercises }}
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <input type="checkbox" name="exercise_ids" value="{{ .ID }}" id="ex_{{ .ID }}">
+                                    </td>
+                                    <td>#{{ .ID }}</td>
+                                    <td>
+                                        <label for="ex_{{ .ID }}" style="cursor: pointer; font-weight: 500; color: #e1e4e8;">
+                                            {{ .Title }}
+                                        </label>
+                                    </td>
+                                    <td style="color: var(--text-muted); font-size: 13px;">{{ .TopicName }}</td>
+                                    <td style="text-align: center;">
+                                        <span class="badge badge-info">{{ .Difficulty }}</span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <input type="number" step="0.5" min="0.5" name="point_{{ .ID }}" value="1.0" class="point-input">
+                                    </td>
+                                </tr>
+                                {{ else }}
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                                        Ngân hàng bài tập hiện chưa có dữ liệu câu hỏi.
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">Lưu và Tạo bài tập</button>
+                    <a href="/teacher/assignments" class="btn btn-secondary" style="padding: 10px 20px;">Hủy bỏ</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

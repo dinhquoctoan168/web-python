@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"web_python/internal/assignment"
 	"web_python/internal/auth"
 	"web_python/internal/class"
 	"web_python/internal/course"
@@ -108,6 +109,10 @@ func main() {
 	submissionService := submission.NewService(submissionRepo)
 	submissionHandler := submission.NewHandler(submissionService)
 
+	assignmentRepo := assignment.NewRepository(db)
+	assignmentService := assignment.NewService(assignmentRepo)
+	assignmentHandler := assignment.NewHandler(assignmentService, classService, exerciseService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -137,6 +142,7 @@ func main() {
 	mux.HandleFunc("/lesson", auth.RequireLogin(lessonHandler.HandleStudentLesson))
 	mux.HandleFunc("/api/course/curriculum", auth.RequireLogin(lessonHandler.HandleAPICourseCurriculum))
 	mux.HandleFunc("/my-classes", auth.RequireLogin(classHandler.HandleStudentMyClasses))
+	mux.HandleFunc("/my-assignments", auth.RequireLogin(assignmentHandler.HandleStudentMyAssignments))
 
 	// Tuyến đường quản lý môn học, lớp học & chương trình giảng dạy (Giảng viên)
 	mux.HandleFunc("/teacher/courses", auth.RequireTeacher(courseHandler.HandleTeacherListCourses))
@@ -150,6 +156,12 @@ func main() {
 	mux.HandleFunc("/teacher/class/create", auth.RequireTeacher(classHandler.HandleTeacherCreateClass))
 	mux.HandleFunc("/teacher/class/enroll", auth.RequireTeacher(classHandler.HandleTeacherEnrollStudent))
 	mux.HandleFunc("/teacher/class/remove-student", auth.RequireTeacher(classHandler.HandleTeacherRemoveStudent))
+
+	mux.HandleFunc("/teacher/assignments", auth.RequireTeacher(assignmentHandler.HandleTeacherListAssignments))
+	mux.HandleFunc("/teacher/assignment/new", auth.RequireTeacher(assignmentHandler.HandleTeacherNewAssignmentForm))
+	mux.HandleFunc("/teacher/assignment/create", auth.RequireTeacher(assignmentHandler.HandleTeacherCreateAssignment))
+	mux.HandleFunc("/teacher/assignment", auth.RequireTeacher(assignmentHandler.HandleTeacherAssignmentDetail))
+	mux.HandleFunc("/teacher/assignment/publish", auth.RequireTeacher(assignmentHandler.HandleTeacherPublishAssignment))
 
 	mux.HandleFunc("/teacher/curriculum", auth.RequireTeacher(lessonHandler.HandleTeacherCurriculum))
 	mux.HandleFunc("/teacher/chapter/create", auth.RequireTeacher(lessonHandler.HandleTeacherCreateChapter))

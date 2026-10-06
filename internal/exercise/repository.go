@@ -152,3 +152,37 @@ func (r *Repository) ListByLessonID(lessonID int) ([]Exercise, error) {
 	}
 	return list, nil
 }
+
+// ListAll lấy toàn bộ danh sách câu hỏi trong ngân hàng bài tập
+func (r *Repository) ListAll() ([]Exercise, error) {
+	query := `SELECT e.id, e.course_id, e.lesson_id, e.topic_id, COALESCE(t.name, ''), e.title, 
+		e.exercise_type, e.difficulty, e.description, e.initial_code, e.time_limit_ms, e.status, e.created_at 
+		FROM exercises e 
+		LEFT JOIN topics t ON e.topic_id = t.id 
+		ORDER BY e.course_id ASC, e.id ASC`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []Exercise
+	for rows.Next() {
+		var ex Exercise
+		var lid, tid sql.NullInt64
+		if err := rows.Scan(&ex.ID, &ex.CourseID, &lid, &tid, &ex.TopicName, &ex.Title, &ex.ExerciseType, &ex.Difficulty,
+			&ex.Description, &ex.InitialCode, &ex.TimeLimitMS, &ex.Status, &ex.CreatedAt); err != nil {
+			return nil, err
+		}
+		if lid.Valid {
+			v := int(lid.Int64)
+			ex.LessonID = &v
+		}
+		if tid.Valid {
+			v := int(tid.Int64)
+			ex.TopicID = &v
+		}
+		list = append(list, ex)
+	}
+	return list, nil
+}

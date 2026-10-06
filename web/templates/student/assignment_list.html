@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+    <style>
+        .badge-urgent {
+            background-color: rgba(244, 71, 71, 0.2);
+            color: #f44747;
+            border: 1px solid #f44747;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/my-classes">Lớp học của tôi</a>
+            <a href="/my-assignments" class="active">Bài tập được giao</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Bài tập được giao</h1>
+                <p class="page-subtitle">Danh sách các bài tập giáo viên giao cho lớp học của bạn.</p>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Bài tập</th>
+                        <th>Lớp học / Môn học</th>
+                        <th style="width: 100px; text-align: center;">Số câu</th>
+                        <th style="width: 100px; text-align: center;">Tổng điểm</th>
+                        <th style="width: 180px;">Hạn nộp</th>
+                        <th style="width: 130px; text-align: center;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Assignments }}
+                    <tr>
+                        <td>
+                            <div style="font-weight: 600; font-size: 15px; color: #fff; margin-bottom: 4px;">{{ .Title }}</div>
+                            <div style="color: var(--text-muted); font-size: 13px;">{{ .Description }}</div>
+                        </td>
+                        <td>
+                            <div style="font-weight: 500;">{{ .ClassName }}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">{{ .CourseName }}</div>
+                        </td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ .ExerciseCount }}</span></td>
+                        <td style="text-align: center;"><strong>{{ .TotalPoints }}</strong> đ</td>
+                        <td>
+                            {{ if .DueAt }}
+                                <div style="font-size: 13px;">{{ .DueAt.Format "02/01/2006 15:04" }}</div>
+                                {{ if .IsUrgent }}
+                                    <span class="badge-urgent">&#9888; Hạn nộp gấp!</span>
+                                {{ end }}
+                            {{ else }}
+                                <span style="color: var(--text-muted); font-size: 13px;">Không giới hạn</span>
+                            {{ end }}
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="/ide" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Làm bài &rarr;</a>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                            Hiện tại chưa có bài tập nào được giao cho các lớp bạn tham gia.
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

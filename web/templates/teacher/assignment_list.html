@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses">Quản lý Môn</a>
+            <a href="/teacher/classes">Quản lý Lớp</a>
+            <a href="/teacher/assignments" class="active">Giao bài tập</a>
+            <a href="/teacher/submissions">Lịch sử nộp bài</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Quản lý Bài tập Lớp học</h1>
+                <p class="page-subtitle">Giao bài tập từ ngân hàng câu hỏi, thiết lập điểm số và hạn nộp theo lớp.</p>
+            </div>
+            <div>
+                <a href="/teacher/assignment/new" class="btn btn-primary">+ Giao bài tập mới</a>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Tiêu đề bài tập</th>
+                        <th>Lớp học</th>
+                        <th style="width: 100px; text-align: center;">Số câu</th>
+                        <th style="width: 100px; text-align: center;">Tổng điểm</th>
+                        <th style="width: 160px;">Hạn nộp</th>
+                        <th style="width: 110px; text-align: center;">Trạng thái</th>
+                        <th style="width: 120px; text-align: center;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Assignments }}
+                    <tr>
+                        <td>#{{ .ID }}</td>
+                        <td>
+                            <a href="/teacher/assignment?id={{ .ID }}" style="color: var(--accent-blue, #61afef); font-weight: 600; text-decoration: none;">
+                                {{ .Title }}
+                            </a>
+                        </td>
+                        <td>
+                            <strong>{{ .ClassName }}</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">{{ .CourseCode }} - {{ .CourseName }}</div>
+                        </td>
+                        <td style="text-align: center;"><span class="badge badge-info">{{ len .Exercises }}</span></td>
+                        <td style="text-align: center;"><strong>{{ .TotalPoints }}</strong> đ</td>
+                        <td>
+                            {{ if .DueAt }}
+                                <span style="font-size: 13px;">{{ .DueAt.Format "02/01/2006 15:04" }}</span>
+                            {{ else }}
+                                <span style="color: var(--text-muted); font-size: 13px;">Không giới hạn</span>
+                            {{ end }}
+                        </td>
+                        <td style="text-align: center;">
+                            {{ if eq .Status "published" }}
+                                <span class="badge badge-success">Đã phát hành</span>
+                            {{ else if eq .Status "closed" }}
+                                <span class="badge badge-secondary">Đã đóng</span>
+                            {{ else }}
+                                <span class="badge badge-warning">Bản nháp</span>
+                            {{ end }}
+                        </td>
+                        <td style="text-align: center;">
+                            <a href="/teacher/assignment?id={{ .ID }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Chi tiết</a>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">
+                            Chưa có bài tập nào được giao. Hãy nhấn "+ Giao bài tập mới" để bắt đầu.
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

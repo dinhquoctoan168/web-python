@@ -87,3 +87,8 @@ func (s *Service) GetExerciseForJudge(id int) (*Exercise, error) {
 
 	return ex, nil
 }
+
+// ListAll lấy toàn bộ danh sách câu hỏi trong ngân hàng bài tập
+func (s *Service) ListAll() ([]Exercise, error) {
+	return s.repo.ListAll()
+}
