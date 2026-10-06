@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/teacher.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/teacher" class="nav-brand">
+            <span>&#127891;</span>
+            <span>Teacher <strong>Dashboard</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/teacher">Tổng quan</a>
+            <a href="/teacher/courses">Môn học</a>
+            <a href="/teacher/classes" class="active">Lớp học</a>
+            <a href="/teacher/submissions">Bài nộp</a>
+            <a href="/teacher/exam/monitoring">Giám sát thi</a>
+            <a href="/courses">Xem trang học viên</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div class="breadcrumb">
+                <a href="/teacher">&larr; Bảng điều khiển</a> /
+                <a href="/teacher/class/analytics?class_id={{ .ClassID }}">Lớp {{ .ClassName }}</a> /
+                <span>Nhật ký sinh viên</span>
+            </div>
+            <h1 class="page-title">&#128100; {{ .Student.FullName }} (@{{ .Student.Username }})</h1>
+            <p class="page-subtitle">Chẩn đoán hành vi học tập và phát hiện các bài tập sinh viên đang gặp khó khăn.</p>
+        </div>
+
+        <!-- Bảng chi tiết từng bài tập -->
+        <section>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Bài tập</th>
+                            <th style="text-align: center;">Trạng thái</th>
+                            <th style="text-align: center;" title="Số lần nộp bài chính thức">Attempts</th>
+                            <th style="text-align: center;" title="Số lần bấm Chạy mã (Ctrl+Enter)">Run</th>
+                            <th style="text-align: center;" title="Số lần bấm Chấm thử">Test</th>
+                            <th style="text-align: center;" title="Số lần mở xem đề / gợi ý giải thuật">Hint</th>
+                            <th style="text-align: center;">Điểm số</th>
+                            <th>Chẩn đoán học tập</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Diagnostics }}
+                        <tr {{ if .IsStruggling }}style="background-color: rgba(239, 68, 68, 0.05);"{{ end }}>
+                            <td>
+                                <strong style="color: var(--text-bright);">{{ .ExerciseTitle }}</strong>
+                                <span style="font-size: 11px; margin-left: 6px; color: var(--text-muted);">[{{ .Difficulty }}]</span>
+                            </td>
+                            <td style="text-align: center;">
+                                {{ if eq .Status "completed" }}
+                                <span class="badge-normal">&#10003; Đã giải</span>
+                                {{ else if eq .Status "in_progress" }}
+                                <span style="display:inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">Đang làm</span>
+                                {{ else }}
+                                <span style="color: var(--text-muted); font-size: 12px;">Chưa làm</span>
+                                {{ end }}
+                            </td>
+                            <td style="text-align: center; font-weight: 600;">
+                                {{ .Attempts }}
+                            </td>
+                            <td style="text-align: center; color: #a5b4fc;">
+                                {{ .RunCount }}
+                            </td>
+                            <td style="text-align: center; color: #67e8f9;">
+                                {{ .TestCount }}
+                            </td>
+                            <td style="text-align: center; color: #fde047; font-weight: {{ if gt .HintCount 0 }}bold{{ else }}normal{{ end }};">
+                                {{ .HintCount }}
+                            </td>
+                            <td style="text-align: center;">
+                                <strong style="color: {{ if ge .Score 100.0 }}#34d399{{ else if ge .Score 50.0 }}#fbbf24{{ else }}#f87171{{ end }};">
+                                    {{ printf "%.0f" .Score }}
+                                </strong>
+                            </td>
+                            <td>
+                                {{ if .IsStruggling }}
+                                <span class="badge-struggle" style="display: inline-flex; align-items: center; gap: 4px;">
+                                    &#9888; {{ .StruggleReason }}
+                                </span>
+                                {{ else }}
+                                <span style="color: var(--text-muted); font-size: 12px;">Bình thường</span>
+                                {{ end }}
+                            </td>
+                        </tr>
+                        {{ else }}
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                                Chưa có dữ liệu bài tập trong môn học này.
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

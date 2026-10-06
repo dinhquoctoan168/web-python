@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/teacher.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/teacher" class="nav-brand">
+            <span>&#127891;</span>
+            <span>Teacher <strong>Dashboard</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/teacher" class="active">Tổng quan</a>
+            <a href="/teacher/courses">Môn học</a>
+            <a href="/teacher/classes">Lớp học</a>
+            <a href="/teacher/submissions">Bài nộp</a>
+            <a href="/teacher/exam/monitoring">Giám sát thi</a>
+            <a href="/courses">Xem trang học viên</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <h1 class="page-title">Bảng điều khiển Giảng viên</h1>
+            <p class="page-subtitle">Theo dõi tổng thể các lớp học phần, tiến độ rèn luyện và chẩn đoán khó khăn học tập của sinh viên.</p>
+        </div>
+
+        <!-- KPI Grid -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <span class="kpi-label">Môn học phụ trách</span>
+                <span class="kpi-value highlight-blue">{{ .Summary.TotalCourses }}</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Lớp học phần</span>
+                <span class="kpi-value highlight-green">{{ .Summary.TotalClasses }}</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Tổng sinh viên</span>
+                <span class="kpi-value highlight-purple">{{ .Summary.TotalStudents }}</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Đợt bài tập</span>
+                <span class="kpi-value highlight-orange">{{ .Summary.TotalAssignments }}</span>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Kỳ thi trực tuyến</span>
+                <span class="kpi-value">{{ .Summary.TotalExams }}</span>
+            </div>
+        </div>
+
+        <!-- Classes Section -->
+        <section>
+            <div class="page-header" style="margin-bottom: 16px;">
+                <h2 style="font-size: 18px; color: var(--text-bright);">&#128187; Lớp học phần & Tiến độ hoàn thành</h2>
+            </div>
+
+            <div class="classes-grid">
+                {{ range .Classes }}
+                <div class="class-card">
+                    <div class="class-meta">
+                        <span class="course-code">{{ .CourseCode }}</span>
+                        <span class="semester-badge">{{ .Semester }} &bull; {{ .AcademicYear }}</span>
+                    </div>
+                    <h3 class="class-title">{{ .Name }}</h3>
+                    <p class="course-sub">Môn học: <strong>{{ .CourseName }}</strong></p>
+
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: {{ .CompletionRate }}%;"></div>
+                    </div>
+
+                    <div class="class-stats">
+                        <span>Sĩ số: <strong>{{ .StudentCount }}</strong> sinh viên</span>
+                        <span>Hoàn thành: <strong>{{ .CompletionRate }}%</strong></span>
+                    </div>
+
+                    <div class="class-action">
+                        <a href="/teacher/class/analytics?class_id={{ .ID }}" class="btn btn-primary btn-block">
+                            Phân tích chi tiết lớp &rarr;
+                        </a>
+                    </div>
+                </div>
+                {{ else }}
+                <div class="empty-card" style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-muted); background: var(--bg-card); border-radius: 8px;">
+                    Chưa có lớp học nào được phân công hoặc tạo mới.
+                </div>
+                {{ end }}
+            </div>
+        </section>
+    </main>
+</body>
+</html>

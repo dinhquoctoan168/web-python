@@ -27,6 +27,7 @@ import (
 	"web_python/internal/practice"
 	"web_python/internal/quiz"
 	"web_python/internal/submission"
+	"web_python/internal/teacher"
 )
 
 // loadEnv đọc tệp cấu hình .env thủ công bằng standard library để không phụ thuộc lib ngoài
@@ -133,6 +134,10 @@ func main() {
 	dashboardService := dashboard.NewService(dashboardRepo)
 	dashboardHandler := dashboard.NewHandler(dashboardService)
 
+	teacherRepo := teacher.NewRepository(db)
+	teacherService := teacher.NewService(teacherRepo, db)
+	teacherDashboardHandler := teacher.NewHandler(teacherService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -168,6 +173,10 @@ func main() {
 	mux.HandleFunc("/exam/take", auth.RequireLogin(examHandler.HandleStudentTakeExam))
 
 	// Tuyến đường quản lý môn học, lớp học & chương trình giảng dạy (Giảng viên)
+	mux.HandleFunc("/teacher", auth.RequireTeacher(teacherDashboardHandler.HandleTeacherDashboard))
+	mux.HandleFunc("/teacher/dashboard", auth.RequireTeacher(teacherDashboardHandler.HandleTeacherDashboard))
+	mux.HandleFunc("/teacher/class/analytics", auth.RequireTeacher(teacherDashboardHandler.HandleClassAnalytics))
+	mux.HandleFunc("/teacher/student/detail", auth.RequireTeacher(teacherDashboardHandler.HandleStudentDetail))
 	mux.HandleFunc("/teacher/courses", auth.RequireTeacher(courseHandler.HandleTeacherListCourses))
 	mux.HandleFunc("/teacher/course/new", auth.RequireTeacher(courseHandler.HandleTeacherNewCourseForm))
 	mux.HandleFunc("/teacher/course/create", auth.RequireTeacher(courseHandler.HandleTeacherCreateCourse))
@@ -218,7 +227,7 @@ func main() {
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/courses", http.StatusSeeOther)
+		http.Redirect(w, r, "/teacher", http.StatusSeeOther)
 	})
 
 	// API endpoints

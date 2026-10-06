@@ -26,7 +26,7 @@ func (h *Handler) ShowLoginPage(w http.ResponseWriter, r *http.Request) {
 	// Nếu đã đăng nhập, chuyển hướng thẳng vào /ide
 	if user := GetUser(r.Context()); user != nil {
 		if user.Role == RoleTeacher || user.Role == RoleAdmin {
-			http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
+			http.Redirect(w, r, "/teacher", http.StatusSeeOther)
 		} else {
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		}
@@ -74,7 +74,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if user.Role == RoleTeacher || user.Role == RoleAdmin {
-		http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
+		http.Redirect(w, r, "/teacher", http.StatusSeeOther)
 	} else {
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 	}

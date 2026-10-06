@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/teacher.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="/teacher" class="nav-brand">
+            <span>&#127891;</span>
+            <span>Teacher <strong>Dashboard</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/teacher">Tổng quan</a>
+            <a href="/teacher/courses">Môn học</a>
+            <a href="/teacher/classes" class="active">Lớp học</a>
+            <a href="/teacher/submissions">Bài nộp</a>
+            <a href="/teacher/exam/monitoring">Giám sát thi</a>
+            <a href="/courses">Xem trang học viên</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div class="breadcrumb">
+                <a href="/teacher">&larr; Bảng điều khiển</a> / Phân tích lớp học
+            </div>
+            <h1 class="page-title">{{ .Analytics.ClassName }} ({{ .Analytics.CourseCode }} - {{ .Analytics.CourseName }})</h1>
+            <p class="page-subtitle">
+                Học kỳ: <strong>{{ .Analytics.Semester }} ({{ .Analytics.AcademicYear }})</strong> &bull;
+                Sĩ số: <strong>{{ .Analytics.StudentCount }} sinh viên</strong> &bull;
+                Tiến độ chung cả lớp: <strong>{{ .Analytics.OverallProgress }}%</strong>
+            </p>
+        </div>
+
+        <!-- Tiến độ theo từng chương học (Chapter Breakdown) -->
+        {{ if .Analytics.ChapterStats }}
+        <section style="margin-bottom: 28px;">
+            <h2 style="font-size: 16px; color: var(--text-bright); margin-bottom: 12px;">&#128214; Tỷ lệ hoàn thành theo từng chương</h2>
+            <div class="chapter-stats-container">
+                {{ range .Analytics.ChapterStats }}
+                <div class="chapter-stat-card">
+                    <div class="chapter-title">{{ .ChapterTitle }}</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" style="width: {{ .CompletionRate }}%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
+                        <span>{{ .TotalExercises }} bài tập</span>
+                        <span>Hoàn thành: <strong style="color: var(--accent-emerald);">{{ .CompletionRate }}%</strong></span>
+                    </div>
+                </div>
+                {{ end }}
+            </div>
+        </section>
+        {{ end }}
+
+        <!-- Bảng danh sách sinh viên & Chẩn đoán học tập -->
+        <section>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 style="font-size: 16px; color: var(--text-bright);">&#128101; Danh sách sinh viên & Tình hình rèn luyện</h2>
+                <span style="font-size: 13px; color: var(--text-muted);">Bấm vào sinh viên để xem chi tiết bài tập gặp khó</span>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Sinh viên</th>
+                            <th style="width: 140px;">Tiến độ môn</th>
+                            <th style="text-align: center;">Điểm TB</th>
+                            <th style="text-align: center;">Chưa làm</th>
+                            <th>Lần hoạt động cuối</th>
+                            <th style="text-align: center;">Tình trạng</th>
+                            <th style="text-align: right;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Analytics.Students }}
+                        <tr>
+                            <td>
+                                <strong style="color: var(--text-bright);">{{ .FullName }}</strong><br>
+                                <span style="font-size: 11px; color: var(--text-muted);">@{{ .Username }}</span>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div class="progress-bar-container" style="margin-bottom: 0; flex: 1;">
+                                        <div class="progress-bar" style="width: {{ .ProgressPercent }}%;"></div>
+                                    </div>
+                                    <span style="font-size: 12px; font-weight: 600;">{{ .ProgressPercent }}%</span>
+                                </div>
+                            </td>
+                            <td style="text-align: center; font-weight: 600; color: #38bdf8;">
+                                {{ printf "%.1f" .AverageScore }}
+                            </td>
+                            <td style="text-align: center; color: var(--text-muted);">
+                                {{ .IncompleteExercises }} bài
+                            </td>
+                            <td style="color: var(--text-muted); font-size: 12px;">
+                                {{ .LastActivity }}
+                            </td>
+                            <td style="text-align: center;">
+                                {{ if .HasStruggling }}
+                                <span class="badge-struggle" title="Sinh viên có bài tập thử nhiều lần hoặc xem gợi ý nhưng chưa đạt điểm">
+                                    &#9888; Cần hỗ trợ
+                                </span>
+                                {{ else }}
+                                <span class="badge-normal">Bình thường</span>
+                                {{ end }}
+                            </td>
+                            <td style="text-align: right;">
+                                <a href="/teacher/student/detail?student_id={{ .StudentID }}&class_id={{ $.Analytics.ClassID }}" class="btn btn-sm btn-primary">
+                                    Xem nhật ký &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                        {{ else }}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                                Lớp học này chưa có sinh viên nào được ghi danh.
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
