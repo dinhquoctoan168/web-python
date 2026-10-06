@@ -17,6 +17,7 @@ import (
 	"web_python/internal/class"
 	"web_python/internal/course"
 	"web_python/internal/database"
+	"web_python/internal/exercise"
 	"web_python/internal/frontend"
 	"web_python/internal/lesson"
 )
@@ -93,6 +94,10 @@ func main() {
 	lessonService := lesson.NewService(lessonRepo)
 	lessonHandler := lesson.NewHandler(lessonService)
 
+	exerciseRepo := exercise.NewRepository(db)
+	exerciseService := exercise.NewService(exerciseRepo)
+	exerciseHandler := exercise.NewHandler(exerciseService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -158,7 +163,7 @@ func main() {
 	})
 
 	// API endpoints
-	mux.HandleFunc("/api/exercise", frontend.HandleAPIExercise)
+	mux.HandleFunc("/api/exercise", exerciseHandler.HandleAPIExercise)
 	mux.HandleFunc("/api/functions", frontend.HandleAPIFunctions)
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware

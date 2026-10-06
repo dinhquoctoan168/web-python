@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 )
@@ -170,6 +171,123 @@ var migrations = []Migration{
 					return err
 				}
 			}
+			return nil
+		},
+	},
+	{
+		Version: 6,
+		Name:    "exercises",
+		Up: func(tx *sql.Tx) error {
+			// 1. Đổi tên exercises cũ thành exercises_old
+			if _, err := tx.Exec(`ALTER TABLE exercises RENAME TO exercises_old;`); err != nil {
+				return err
+			}
+
+			// 2. Tạo bảng exercises mới
+			createExercises := `CREATE TABLE exercises (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				course_id INTEGER NOT NULL DEFAULT 3,
+				lesson_id INTEGER,
+				topic_id INTEGER,
+				title TEXT NOT NULL,
+				exercise_type TEXT NOT NULL DEFAULT 'coding',
+				difficulty TEXT DEFAULT 'Dễ',
+				description TEXT NOT NULL,
+				initial_code TEXT,
+				solution_code TEXT,
+				solution_hint TEXT,
+				allowed_functions TEXT,
+				time_limit_ms INTEGER DEFAULT 5000,
+				status TEXT DEFAULT 'active',
+				created_by INTEGER,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY(course_id) REFERENCES courses(id),
+				FOREIGN KEY(lesson_id) REFERENCES lessons(id)
+			);`
+			if _, err := tx.Exec(createExercises); err != nil {
+				return err
+			}
+
+			// 3. Tạo bảng exercise_test_cases
+			createTestCases := `CREATE TABLE exercise_test_cases (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				exercise_id INTEGER NOT NULL,
+				input_data TEXT,
+				call_expression TEXT,
+				expected_output TEXT,
+				is_hidden INTEGER DEFAULT 0,
+				weight REAL DEFAULT 1,
+				order_num INTEGER DEFAULT 0,
+				FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+			);`
+			if _, err := tx.Exec(createTestCases); err != nil {
+				return err
+			}
+
+			// 4. Sao chép dữ liệu bài tập từ exercises_old sang exercises mới
+			copyExercises := `INSERT INTO exercises (id, course_id, topic_id, title, difficulty, description, initial_code, allowed_functions, solution_hint, created_at)
+			SELECT id, 3, topic_id, title, difficulty, description, initial_code, allowed_functions, solution_hint, created_at
+			FROM exercises_old;`
+			if _, err := tx.Exec(copyExercises); err != nil {
+				return err
+			}
+
+			// 5. Chuyển đổi test_cases JSON sang bảng quan hệ exercise_test_cases
+			rows, err := tx.Query(`SELECT id, test_cases FROM exercises_old`)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+
+			type oldTestCase struct {
+				Call     string `json:"call"`
+				Input    string `json:"input"`
+				Expected string `json:"expected"`
+			}
+
+			type exRow struct {
+				id  int
+				raw string
+			}
+			var exRows []exRow
+			for rows.Next() {
+				var item exRow
+				if err := rows.Scan(&item.id, &item.raw); err != nil {
+					return err
+				}
+				exRows = append(exRows, item)
+			}
+			rows.Close()
+
+			insertTC := `INSERT INTO exercise_test_cases (exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) VALUES (?, ?, ?, ?, ?, ?, ?)`
+			for _, item := range exRows {
+				var tcs []oldTestCase
+				if err := json.Unmarshal([]byte(item.raw), &tcs); err == nil {
+					for idx, tc := range tcs {
+						if _, err := tx.Exec(insertTC, item.id, tc.Input, tc.Call, tc.Expected, 0, 1.0, idx+1); err != nil {
+							return err
+						}
+					}
+				}
+
+				// Bổ sung hidden test case tương ứng cho từng bài
+				switch item.id {
+				case 1:
+					_, _ = tx.Exec(insertTC, item.id, "[100, 2, 50, -99, 0, 1000]", "find_min_max([100, 2, 50, -99, 0, 1000])", "(-99, 1000)", 1, 1.0, 99)
+				case 2:
+					_, _ = tx.Exec(insertTC, item.id, `"{[()]}"`, `is_valid_parentheses("{[()]}")`, "True", 1, 1.0, 99)
+				case 3:
+					_, _ = tx.Exec(insertTC, item.id, "students, min_gpa=4.0, dept='CNTT'", "query_students(students, 4.0, 'CNTT')", "[]", 1, 1.0, 99)
+				case 4:
+					_, _ = tx.Exec(insertTC, item.id, "arr=[1, 3, 5, 7, 9], target=1", "binary_search([1, 3, 5, 7, 9], 1)", "0", 1, 1.0, 99)
+				}
+			}
+
+			// 6. Xóa bảng exercises_old
+			if _, err := tx.Exec(`DROP TABLE exercises_old;`); err != nil {
+				return err
+			}
+
 			return nil
 		},
 	},

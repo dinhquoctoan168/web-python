@@ -63,7 +63,7 @@ func GetTopicsWithExercises() ([]Topic, error) {
 	}
 
 	for i := range topics {
-		exRows, err := db.Query(`SELECT id, topic_id, title, difficulty, description, initial_code, allowed_functions, test_cases, solution_hint 
+		exRows, err := db.Query(`SELECT id, topic_id, title, difficulty, description, initial_code, allowed_functions, COALESCE(solution_hint, '') 
 			FROM exercises WHERE topic_id = ? ORDER BY id ASC`, topics[i].ID)
 		if err != nil {
 			return nil, err
@@ -73,12 +73,36 @@ func GetTopicsWithExercises() ([]Topic, error) {
 		for exRows.Next() {
 			var ex Exercise
 			var allowedFuncsRaw string
-			if err := exRows.Scan(&ex.ID, &ex.TopicID, &ex.Title, &ex.Difficulty, &ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.TestCasesJSON, &ex.SolutionHint); err != nil {
+			if err := exRows.Scan(&ex.ID, &ex.TopicID, &ex.Title, &ex.Difficulty, &ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint); err != nil {
 				exRows.Close()
 				return nil, err
 			}
 			// Parse JSON danh sách hàm cho phép
 			_ = json.Unmarshal([]byte(allowedFuncsRaw), &ex.AllowedFunctions)
+
+			// Lấy public test cases (is_hidden = 0)
+			tcRows, tcErr := db.Query(`SELECT input_data, call_expression, expected_output 
+				FROM exercise_test_cases WHERE exercise_id = ? AND is_hidden = 0 ORDER BY order_num ASC, id ASC`, ex.ID)
+			if tcErr == nil {
+				type clientTC struct {
+					Call     string `json:"call"`
+					Input    string `json:"input"`
+					Expected string `json:"expected"`
+				}
+				var tcs []clientTC
+				for tcRows.Next() {
+					var inp, call, exp string
+					if err := tcRows.Scan(&inp, &call, &exp); err == nil {
+						tcs = append(tcs, clientTC{Call: call, Input: inp, Expected: exp})
+					}
+				}
+				tcRows.Close()
+				tcBytes, _ := json.Marshal(tcs)
+				ex.TestCasesJSON = string(tcBytes)
+			} else {
+				ex.TestCasesJSON = "[]"
+			}
+
 			exercises = append(exercises, ex)
 		}
 		exRows.Close()
@@ -88,20 +112,21 @@ func GetTopicsWithExercises() ([]Topic, error) {
 	return topics, nil
 }
 
-// GetExerciseByID lấy chi tiết 1 bài tập theo id
+// GetExerciseByID lấy chi tiết 1 bài tập theo id (CHỈ trả public test cases, KHÔNG trả hidden tests hay solution code)
 func GetExerciseByID(id int) (*Exercise, error) {
 	db := database.GetDB()
 	var ex Exercise
 	var allowedFuncsRaw string
 
-	query := `SELECT e.id, e.topic_id, t.name, e.title, e.difficulty, e.description, e.initial_code, e.allowed_functions, e.test_cases, e.solution_hint 
+	query := `SELECT e.id, e.topic_id, COALESCE(t.name, ''), e.title, e.difficulty, e.description, e.initial_code, 
+		COALESCE(e.allowed_functions, '[]'), COALESCE(e.solution_hint, '') 
 		FROM exercises e 
-		JOIN topics t ON e.topic_id = t.id 
+		LEFT JOIN topics t ON e.topic_id = t.id 
 		WHERE e.id = ?`
 
 	err := db.QueryRow(query, id).Scan(
 		&ex.ID, &ex.TopicID, &ex.TopicName, &ex.Title, &ex.Difficulty,
-		&ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.TestCasesJSON, &ex.SolutionHint,
+		&ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -111,6 +136,30 @@ func GetExerciseByID(id int) (*Exercise, error) {
 	}
 
 	_ = json.Unmarshal([]byte(allowedFuncsRaw), &ex.AllowedFunctions)
+
+	// Truy vấn các public test cases (is_hidden = 0)
+	tcRows, err := db.Query(`SELECT input_data, call_expression, expected_output 
+		FROM exercise_test_cases WHERE exercise_id = ? AND is_hidden = 0 ORDER BY order_num ASC, id ASC`, ex.ID)
+	if err == nil {
+		type clientTC struct {
+			Call     string `json:"call"`
+			Input    string `json:"input"`
+			Expected string `json:"expected"`
+		}
+		var tcs []clientTC
+		for tcRows.Next() {
+			var inp, call, exp string
+			if err := tcRows.Scan(&inp, &call, &exp); err == nil {
+				tcs = append(tcs, clientTC{Call: call, Input: inp, Expected: exp})
+			}
+		}
+		tcRows.Close()
+		tcBytes, _ := json.Marshal(tcs)
+		ex.TestCasesJSON = string(tcBytes)
+	} else {
+		ex.TestCasesJSON = "[]"
+	}
+
 	return &ex, nil
 }
 

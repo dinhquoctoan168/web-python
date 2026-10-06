@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 
 	"web_python/internal/auth"
@@ -148,12 +149,55 @@ print("Vị trí của", target, "là:", binary_search(arr, target))
 	}
 
 	for _, ex := range exercises {
-		_, err := db.Exec(`INSERT INTO exercises 
-			(topic_id, title, difficulty, description, initial_code, allowed_functions, test_cases, solution_hint) 
+		res, err := db.Exec(`INSERT INTO exercises 
+			(course_id, topic_id, title, difficulty, description, initial_code, allowed_functions, solution_hint) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			ex.topicID, ex.title, ex.difficulty, ex.desc, ex.initialCode, ex.allowedFunctions, ex.testCases, ex.hint)
+			3, ex.topicID, ex.title, ex.difficulty, ex.desc, ex.initialCode, ex.allowedFunctions, ex.hint)
 		if err != nil {
 			return err
+		}
+		exID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+
+		type oldTC struct {
+			Call     string `json:"call"`
+			Input    string `json:"input"`
+			Expected string `json:"expected"`
+		}
+		var tcs []oldTC
+		if err := json.Unmarshal([]byte(ex.testCases), &tcs); err == nil {
+			for idx, tc := range tcs {
+				_, _ = db.Exec(`INSERT INTO exercise_test_cases 
+					(exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) 
+					VALUES (?, ?, ?, ?, 0, 1.0, ?)`,
+					exID, tc.Input, tc.Call, tc.Expected, idx+1)
+			}
+		}
+
+		// Thêm hidden test case tương ứng
+		switch ex.topicID {
+		case 1:
+			_, _ = db.Exec(`INSERT INTO exercise_test_cases 
+				(exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) 
+				VALUES (?, ?, ?, ?, 1, 1.0, 99)`,
+				exID, "[100, 2, 50, -99, 0, 1000]", "find_min_max([100, 2, 50, -99, 0, 1000])", "(-99, 1000)")
+		case 2:
+			_, _ = db.Exec(`INSERT INTO exercise_test_cases 
+				(exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) 
+				VALUES (?, ?, ?, ?, 1, 1.0, 99)`,
+				exID, `"{[()]}"`, `is_valid_parentheses("{[()]}")`, "True")
+		case 3:
+			_, _ = db.Exec(`INSERT INTO exercise_test_cases 
+				(exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) 
+				VALUES (?, ?, ?, ?, 1, 1.0, 99)`,
+				exID, "students, min_gpa=4.0, dept='CNTT'", "query_students(students, 4.0, 'CNTT')", "[]")
+		case 4:
+			_, _ = db.Exec(`INSERT INTO exercise_test_cases 
+				(exercise_id, input_data, call_expression, expected_output, is_hidden, weight, order_num) 
+				VALUES (?, ?, ?, ?, 1, 1.0, 99)`,
+				exID, "arr=[1, 3, 5, 7, 9], target=1", "binary_search([1, 3, 5, 7, 9], 1)", "0")
 		}
 	}
 
