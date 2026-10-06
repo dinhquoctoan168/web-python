@@ -55,7 +55,7 @@ func (r *Repository) CreateExam(e *Exam, exerciseIDs []int, points []float64) (*
 
 // FindByID lấy chi tiết kỳ thi kèm danh sách câu hỏi
 func (r *Repository) FindByID(id int) (*Exam, error) {
-	query := `SELECT e.id, e.class_id, c.name, co.code, co.name, e.title, e.description,
+	query := `SELECT e.id, e.class_id, c.name, co.code, co.name, e.title, COALESCE(e.description, ''),
 		e.duration_minutes, e.start_at, e.end_at, e.status, e.created_by, e.created_at
 		FROM exams e
 		JOIN classes c ON e.class_id = c.id
@@ -417,5 +417,16 @@ func (r *Repository) GetExamMonitoringReport(examID int) ([]StudentMonitoringSum
 	}
 
 	return summaries, nil
+}
+
+// IsStudentEnrolledInExam kiểm tra xem học viên có thuộc lớp được phân công bài thi hay không
+func (r *Repository) IsStudentEnrolledInExam(examID, studentID int) (bool, error) {
+	var count int
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM exams e
+		JOIN enrollments en ON e.class_id = en.class_id
+		WHERE e.id = ? AND en.student_id = ?`, examID, studentID).Scan(&count)
+	return count > 0, err
 }
 

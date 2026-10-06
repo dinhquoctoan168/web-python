@@ -27,6 +27,7 @@ import (
 	"web_python/internal/practice"
 	"web_python/internal/progress"
 	"web_python/internal/quiz"
+	"web_python/internal/security"
 	"web_python/internal/submission"
 	"web_python/internal/teacher"
 )
@@ -255,8 +256,9 @@ func main() {
 	mux.HandleFunc("/api/progress/chapter", auth.RequireLogin(progressHandler.HandleGetChapterProgress))
 	mux.HandleFunc("/api/progress/lesson", auth.RequireLogin(progressHandler.HandleGetLessonProgress))
 
-	// Bọc toàn bộ handler với AuthenticateMiddleware
-	rootHandler := authMiddleware.AuthenticateMiddleware(mux)
+	// Bọc toàn bộ handler với CSRFMiddleware và AuthenticateMiddleware (Phase 19)
+	csrfMiddleware := security.CSRFMiddleware("/login", "/logout")
+	rootHandler := authMiddleware.AuthenticateMiddleware(csrfMiddleware(mux))
 
 	server := &http.Server{
 		Addr:         ":" + port,

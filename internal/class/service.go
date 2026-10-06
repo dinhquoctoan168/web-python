@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	ErrInvalidClassData = errors.New("tên lớp học và môn học không được để trống")
+	ErrInvalidClassData     = errors.New("tên lớp học và môn học không được để trống")
+	ErrUnauthorizedTeacher = errors.New("giảng viên không có quyền quản lý lớp học này")
 )
 
 // Service cung cấp logic nghiệp vụ cho lớp học và ghi danh
@@ -117,4 +118,22 @@ func (s *Service) RemoveStudent(classID, studentID int) error {
 		return errors.New("thông tin lớp học hoặc sinh viên không hợp lệ")
 	}
 	return s.repo.RemoveStudent(classID, studentID)
+}
+
+// VerifyTeacherOwnership kiểm tra giảng viên có quyền quản lý lớp học hay không (trừ admin)
+func (s *Service) VerifyTeacherOwnership(classID, teacherID int, isAdmin bool) error {
+	if isAdmin {
+		return nil
+	}
+	if classID <= 0 || teacherID <= 0 {
+		return ErrUnauthorizedTeacher
+	}
+	cl, err := s.repo.FindClassByID(classID)
+	if err != nil {
+		return err
+	}
+	if cl.TeacherID != teacherID {
+		return ErrUnauthorizedTeacher
+	}
+	return nil
 }

@@ -42,6 +42,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
+    // Phase 19: Trích xuất CSRF Token gửi kèm các request thay đổi dữ liệu (POST)
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.content) return meta.content;
+        const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
     // --- Quản lý tiến độ luyện tập & Tự động lưu (Phase 7: Student Practice) ---
     function setSaveStatus(state) {
         if (!saveStatus) return;
@@ -68,7 +76,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveDraftCode(exerciseId, code) {
         fetch('/api/practice/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
             body: JSON.stringify({ exercise_id: exerciseId, code: code })
         })
         .then(res => {
@@ -156,7 +167,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitPracticeResult(exerciseId, code, score, passed) {
         fetch('/api/practice/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
             body: JSON.stringify({
                 exercise_id: exerciseId,
                 code: code,
@@ -183,7 +197,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!currentExercise) return;
         fetch('/api/attempt/action', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
             body: JSON.stringify({ exercise_id: currentExercise.id, action: action })
         }).catch(err => console.error('Lỗi ghi nhận action metric:', err));
     }
@@ -192,7 +209,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function createSubmission(exerciseId, code, score, passedTests, totalTests) {
         fetch('/api/submissions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
             body: JSON.stringify({
                 exercise_id: exerciseId,
                 source_code: code,
@@ -554,7 +574,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         fetch('/api/quiz/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
             body: JSON.stringify({ exercise_id: currentExercise.id, option_id: optionId })
         })
         .then(res => {

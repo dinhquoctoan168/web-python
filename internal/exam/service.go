@@ -127,6 +127,15 @@ func (s *Service) StartOrResumeSession(examID, studentID int) (*ExamSession, *Ex
 		return nil, nil, nil, errors.New("ca thi đã kết thúc")
 	}
 
+	// Kiểm tra phân quyền server-side: Học viên phải thuộc danh sách lớp của bài thi
+	enrolled, err := s.repo.IsStudentEnrolledInExam(examID, studentID)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("lỗi kiểm tra ghi danh: %w", err)
+	}
+	if !enrolled {
+		return nil, nil, nil, errors.New("học viên không thuộc danh sách lớp học của kỳ thi này")
+	}
+
 	session, err := s.repo.GetOrCreateSession(examID, studentID)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("không thể khởi tạo phiên thi: %w", err)
