@@ -1,0 +1,236 @@
+{{ define "content" }}
+<div class="ide-wrapper">
+    <!-- Top Navigation Bar -->
+    <header class="ide-header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">&#128187;</span>
+                <span class="logo-text">AlgoDB <strong>Python IDE</strong></span>
+            </div>
+            <div class="current-exercise-badge">
+                <span class="badge-title" id="topExerciseTitle">{{ if .CurrentExercise }}{{ .CurrentExercise.Title }}{{ else }}Chưa chọn bài{{ end }}</span>
+                <span class="badge-difficulty badge-{{ if .CurrentExercise }}{{ .CurrentExercise.Difficulty }}{{ end }}" id="topExerciseDiff">
+                    {{ if .CurrentExercise }}{{ .CurrentExercise.Difficulty }}{{ end }}
+                </span>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <span class="env-tag">Python 3.12</span>
+            <div id="examModeContainer" class="exam-status-box" style="display: none;">
+                <span class="exam-badge">&#9201; CHẾ ĐỘ THI</span>
+                <span id="examTimer" class="exam-timer">45:00</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <button id="btnStartExam" class="btn btn-warning" title="Bắt đầu chế độ thi toàn màn hình có giám sát chống gian lận">
+                <span class="icon">&#128274;</span> Bắt đầu thi
+            </button>
+            <button id="btnResetCode" class="btn btn-secondary" title="Khôi phục mã ban đầu">
+                <span class="icon">&#8635;</span> Đặt lại
+            </button>
+            <button id="btnRunTests" class="btn btn-info" title="Chạy toàn bộ Test Cases">
+                <span class="icon">&#10003;</span> Chấm thử
+            </button>
+            <button id="btnRunCode" class="btn btn-primary" title="Chạy mã (Ctrl + Enter)">
+                <span class="icon">&#9658;</span> Chạy mã (Ctrl+Enter)
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="ide-main">
+        <!-- Left Sidebar: Problems & Function Search -->
+        <aside class="ide-sidebar">
+            <div class="sidebar-tabs">
+                <button class="sidebar-tab active" data-tab="tab-exercises">Bài tập</button>
+                <button class="sidebar-tab" data-tab="tab-functions">Cú pháp & Hàm</button>
+                <button class="sidebar-tab" data-tab="tab-problem">Đề bài</button>
+            </div>
+
+            <!-- Tab 1: Danh sách bài tập -->
+            <div class="tab-content active" id="tab-exercises">
+                <div class="topic-list">
+                    {{ range .Topics }}
+                    <div class="topic-group">
+                        <div class="topic-title">
+                            <span class="topic-name">{{ .Name }}</span>
+                            <span class="topic-count">{{ len .Exercises }} bài</span>
+                        </div>
+                        <ul class="exercise-items">
+                            {{ range .Exercises }}
+                            <li class="exercise-item {{ if $.CurrentExercise }}{{ if eq $.CurrentExercise.ID .ID }}active{{ end }}{{ end }}" 
+                                data-id="{{ .ID }}" 
+                                id="exercise-item-{{ .ID }}">
+                                <div class="exercise-item-header" onclick="loadExercise({{ .ID }})">
+                                    <span class="ex-bullet">&#9679;</span>
+                                    <span class="ex-name">{{ .Title }}</span>
+                                    <span class="badge-mini badge-{{ .Difficulty }}">{{ .Difficulty }}</span>
+                                    <button class="btn-toggle-problem" type="button" title="Ẩn / Hiện đề bài" onclick="toggleProblemDrawer(event, {{ .ID }})">
+                                        <span class="toggle-text">Ẩn đề</span>
+                                    </button>
+                                </div>
+                                <div class="inline-problem-panel" id="inlineProblem-{{ .ID }}">
+                                    {{ if $.CurrentExercise }}{{ if eq $.CurrentExercise.ID .ID }}
+                                    <div class="inline-problem-desc">{{ .Description }}</div>
+                                    {{ if .AllowedFunctions }}
+                                    <div class="inline-section-title">Hàm cho phép:</div>
+                                    <div class="chip-container">
+                                        {{ range .AllowedFunctions }}
+                                        <span class="func-chip">{{ . }}()</span>
+                                        {{ end }}
+                                    </div>
+                                    {{ end }}
+                                    {{ if .SolutionHint }}
+                                    <div class="inline-hint-box"><strong>Gợi ý:</strong> {{ .SolutionHint }}</div>
+                                    {{ end }}
+                                    {{ end }}{{ end }}
+                                </div>
+                            </li>
+                            {{ end }}
+                        </ul>
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Tab 2: Tra cứu hàm & Giới hạn -->
+            <div class="tab-content" id="tab-functions">
+                <div class="functions-search-box">
+                    <input type="text" id="funcSearchInput" placeholder="Tìm kiếm cú pháp, hàm (if, for, while, len, append)..." autocomplete="off">
+                </div>
+                <div class="allowed-warning-box">
+                    <span class="warning-title">&#9888; Quy tắc bài học:</span>
+                    <p id="allowedFuncsList">Đang tải danh sách hàm cho phép...</p>
+                </div>
+                <div class="functions-list" id="functionsContainer">
+                    {{ range .Functions }}
+                    <div class="function-card" data-name="{{ .Name }}" data-category="{{ .Category }}">
+                        <div class="func-header">
+                            <code class="func-name">{{ .Name }}</code>
+                            <span class="func-cat">{{ .Category }}</span>
+                        </div>
+                        <div class="func-syntax"><code>{{ .Syntax }}</code></div>
+                        <div class="func-desc">{{ .Description }}</div>
+                        <pre class="func-example"><code>{{ .Example }}</code></pre>
+                    </div>
+                    {{ end }}
+                </div>
+            </div>
+
+            <!-- Tab 3: Nội dung Đề bài -->
+            <div class="tab-content" id="tab-problem">
+                <div class="problem-details">
+                    <h3 id="problemTitle">{{ if .CurrentExercise }}{{ .CurrentExercise.Title }}{{ end }}</h3>
+                    <div class="problem-desc" id="problemDesc">
+                        {{ if .CurrentExercise }}{{ .CurrentExercise.Description }}{{ end }}
+                    </div>
+                    
+                    <div class="problem-section">
+                        <h4>Hàm được phép sử dụng:</h4>
+                        <div id="problemAllowedChips" class="chip-container"></div>
+                    </div>
+
+                    <div class="problem-section" id="hintSection">
+                        <h4>Gợi ý giải thuật:</h4>
+                        <div class="hint-box" id="problemHint">
+                            {{ if .CurrentExercise }}{{ .CurrentExercise.SolutionHint }}{{ end }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Resizer handle between Sidebar and Editor -->
+        <div class="sidebar-resizer" id="sidebarResizer" title="Kéo để thay đổi kích thước"></div>
+
+        <!-- Center / Editor & Console Area -->
+        <main class="ide-editor-container">
+            <!-- Code Editor Panel -->
+            <div class="editor-pane">
+                <div class="pane-header">
+                    <div class="pane-title">
+                        <span class="file-icon">&#128196;</span>
+                        <span class="file-name">solution.py</span>
+                        <span class="dirty-indicator" id="dirtyIndicator" style="display:none;">&bull;</span>
+                    </div>
+                    <div class="pane-actions">
+                        <div class="font-size-control">
+                            <button id="btnFontDec" class="btn-font-size" title="Giảm cỡ chữ">A-</button>
+                            <span id="fontSizeDisplay" class="font-size-display">13px</span>
+                            <button id="btnFontInc" class="btn-font-size" title="Tăng cỡ chữ">A+</button>
+                        </div>
+                        <span class="status-tip">Phím tắt: <strong>Ctrl + Enter</strong> để chạy</span>
+                    </div>
+                </div>
+
+                <div class="editor-body">
+                    <div class="line-numbers" id="lineNumbers">1</div>
+                    <div class="editor-code-container">
+                        <pre id="highlighting" aria-hidden="true"><code id="highlightingCode"></code></pre>
+                        <textarea id="codeEditor" spellcheck="false" placeholder="# Nhập code Python vào đây...">{{ if .CurrentExercise }}{{ .CurrentExercise.InitialCode }}{{ end }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Console / Terminal Panel -->
+            <div class="console-pane">
+                <div class="pane-header console-header">
+                    <div class="console-tabs">
+                        <button class="console-tab active" data-target="consoleOutput">Terminal / Console</button>
+                        <button class="console-tab" data-target="testResults">Kết quả Test Cases (<span id="testPassCount">0/0</span>)</button>
+                    </div>
+                    <div class="pane-actions">
+                        <span id="execStatus" class="exec-status">Sẵn sàng</span>
+                        <button id="btnClearConsole" class="btn-icon" title="Xóa màn hình console">&#128465; Xóa</button>
+                    </div>
+                </div>
+
+                <div class="console-body">
+                    <div id="consoleOutput" class="console-tab-view active">
+                        <div class="terminal-intro">Python 3.12 (Interactive Terminal)</div>
+                        <div class="terminal-intro">Nhấn "Chạy mã" (Ctrl+Enter) để thực thi solution.py</div>
+                        <pre id="outputLog"></pre>
+                    </div>
+                    
+                    <div id="testResults" class="console-tab-view">
+                        <div id="testCasesContainer" class="testcases-list">
+                            <div class="empty-state">Chưa chạy bài kiểm thử nào. Nhấn "Chấm thử" để kiểm tra.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Overlay đình chỉ thi khi phát hiện gian lận -->
+<div id="examSuspendedOverlay" class="exam-overlay" style="display: none;">
+    <div class="exam-modal">
+        <div class="modal-icon">&#9888;</div>
+        <h2>BÀI THI BỊ ĐÌNH CHỈ</h2>
+        <div class="modal-badge">PHÁT HIỆN HÀNH VI GIAN LẬN</div>
+        <p class="modal-reason" id="suspendedReason">Bạn đã chuyển sang trang khác hoặc làm mất tiêu điểm màn hình thi.</p>
+        <div class="modal-details">
+            <p>Hệ thống giám sát tự động đã phát hiện hành vi vi phạm quy chế thi.</p>
+            <p>Toàn bộ quyền chỉnh sửa mã nguồn, chạy mã và chấm thử đã bị khóa.</p>
+        </div>
+        <div class="modal-time" id="suspendedTime">Thời điểm vi phạm: --:--:--</div>
+    </div>
+</div>
+
+<!-- Exercise data model -->
+<script>
+    window.INITIAL_EXERCISE = {{ if .CurrentExercise }} {
+        id: {{ .CurrentExercise.ID }},
+        title: {{ .CurrentExercise.Title }},
+        difficulty: {{ .CurrentExercise.Difficulty }},
+        description: {{ .CurrentExercise.Description }},
+        initialCode: {{ .CurrentExercise.InitialCode }},
+        allowedFunctions: {{ .CurrentExercise.AllowedFunctions }},
+        testCasesJSON: {{ .CurrentExercise.TestCasesJSON }},
+        hint: {{ .CurrentExercise.SolutionHint }}
+    } {{ else }} null {{ end }};
+</script>
+{{ end }}

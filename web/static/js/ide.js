@@ -1,0 +1,753 @@
+/**
+ * AlgoDB IDE UI Controller (Pure Vanilla JS, Zero Framework)
+ * Điều phối sự kiện giao diện, soạn thảo mã, tìm kiếm hàm và kết nối engine.
+ */
+
+document.addEventListener('DOMContentLoaded', function() {
+    let currentExercise = window.INITIAL_EXERCISE || null;
+
+    // DOM Elements
+    const codeEditor = document.getElementById('codeEditor');
+    const lineNumbers = document.getElementById('lineNumbers');
+    const outputLog = document.getElementById('outputLog');
+    const execStatus = document.getElementById('execStatus');
+    const btnRunCode = document.getElementById('btnRunCode');
+    const btnRunTests = document.getElementById('btnRunTests');
+    const btnResetCode = document.getElementById('btnResetCode');
+    const btnClearConsole = document.getElementById('btnClearConsole');
+    const dirtyIndicator = document.getElementById('dirtyIndicator');
+    const funcSearchInput = document.getElementById('funcSearchInput');
+    const functionsContainer = document.getElementById('functionsContainer');
+    const allowedFuncsList = document.getElementById('allowedFuncsList');
+    const problemAllowedChips = document.getElementById('problemAllowedChips');
+    const testCasesContainer = document.getElementById('testCasesContainer');
+    const testPassCount = document.getElementById('testPassCount');
+    const sidebarResizer = document.getElementById('sidebarResizer');
+    const ideSidebar = document.querySelector('.ide-sidebar');
+    const btnFontDec = document.getElementById('btnFontDec');
+    const btnFontInc = document.getElementById('btnFontInc');
+    const fontSizeDisplay = document.getElementById('fontSizeDisplay');
+    const highlighting = document.getElementById('highlighting');
+    const highlightingCode = document.getElementById('highlightingCode');
+    const btnStartExam = document.getElementById('btnStartExam');
+    const examModeContainer = document.getElementById('examModeContainer');
+    const examTimer = document.getElementById('examTimer');
+    const examSuspendedOverlay = document.getElementById('examSuspendedOverlay');
+    const suspendedReason = document.getElementById('suspendedReason');
+    const suspendedTime = document.getElementById('suspendedTime');
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Bộ phân tích cú pháp và tô màu mã Python (Python Syntax Highlighter)
+    function highlightPython(code) {
+        if (!code) return '';
+
+        const tokenRegex = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(#.*$)|(\b\d+(?:\.\d+)?\b)|(\b(?:def|return|if|elif|else|for|while|in|is|not|and|or|import|from|class|try|except|finally|raise|pass|break|continue|lambda|as|with|yield|async|await)\b)|(\b(?:True|False|None|self|cls|int|float|str|bool|list|dict|set|tuple)\b)|(\b[a-zA-Z_]\w*(?=\s*\())/gm;
+
+        let lastIdx = 0;
+        let html = '';
+
+        code.replace(tokenRegex, function(match, str, com, num, kw, builtin, fn, offset) {
+            if (offset > lastIdx) {
+                html += escapeHtml(code.slice(lastIdx, offset));
+            }
+
+            if (str) {
+                html += `<span class="token-str">${escapeHtml(str)}</span>`;
+            } else if (com) {
+                html += `<span class="token-com">${escapeHtml(com)}</span>`;
+            } else if (num) {
+                html += `<span class="token-num">${escapeHtml(num)}</span>`;
+            } else if (kw) {
+                html += `<span class="token-kw">${escapeHtml(kw)}</span>`;
+            } else if (builtin) {
+                html += `<span class="token-builtin">${escapeHtml(builtin)}</span>`;
+            } else if (fn) {
+                html += `<span class="token-fn">${escapeHtml(fn)}</span>`;
+            } else {
+                html += escapeHtml(match);
+            }
+
+            lastIdx = offset + match.length;
+            return match;
+        });
+
+        if (lastIdx < code.length) {
+            html += escapeHtml(code.slice(lastIdx));
+        }
+
+        return html;
+    }
+
+    function updateHighlighting() {
+        if (highlightingCode) {
+            highlightingCode.innerHTML = highlightPython(codeEditor.value) + '\n';
+        }
+    }
+
+    // 1. Khởi tạo Editor & Line Numbers
+    function updateLineNumbers() {
+        const lines = codeEditor.value.split('\n').length;
+        let lineNumbersHtml = '';
+        for (let i = 1; i <= lines; i++) {
+            lineNumbersHtml += i + '<br>';
+        }
+        lineNumbers.innerHTML = lineNumbersHtml;
+    }
+
+    codeEditor.addEventListener('input', function() {
+        updateLineNumbers();
+        updateHighlighting();
+        if (currentExercise && codeEditor.value !== currentExercise.initialCode) {
+            dirtyIndicator.style.display = 'inline';
+        } else {
+            dirtyIndicator.style.display = 'none';
+        }
+    });
+
+    codeEditor.addEventListener('scroll', function() {
+        lineNumbers.scrollTop = codeEditor.scrollTop;
+        if (highlighting) {
+            highlighting.scrollTop = codeEditor.scrollTop;
+            highlighting.scrollLeft = codeEditor.scrollLeft;
+        }
+    });
+
+    // Xử lý phím Tab (4 dấu cách) và phím Enter (giữ lề)
+    codeEditor.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 4;
+            updateLineNumbers();
+            updateHighlighting();
+        } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            runCode();
+        } else if (e.key === 'Enter') {
+            // Tự động căn lề (auto-indentation)
+            const start = this.selectionStart;
+            const lines = this.value.substring(0, start).split('\n');
+            const currentLine = lines[lines.length - 1];
+            const match = currentLine.match(/^(\s+)/);
+            let indent = match ? match[1] : '';
+            if (currentLine.trim().endsWith(':')) {
+                indent += '    ';
+            }
+            if (indent) {
+                e.preventDefault();
+                this.value = this.value.substring(0, start) + '\n' + indent + this.value.substring(this.selectionEnd);
+                this.selectionStart = this.selectionEnd = start + 1 + indent.length;
+                updateLineNumbers();
+                updateHighlighting();
+            }
+        }
+    });
+
+    // 2. Chuyển đổi Tabs Sidebar
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            this.classList.add('active');
+            const targetId = this.getAttribute('data-tab');
+            const targetContent = document.getElementById(targetId);
+            if (targetContent) targetContent.classList.add('active');
+        });
+    });
+
+    // 3. Chuyển đổi Tabs Console
+    document.querySelectorAll('.console-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.console-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.console-tab-view').forEach(v => v.classList.remove('active'));
+
+            this.classList.add('active');
+            const targetId = this.getAttribute('data-target');
+            const targetView = document.getElementById(targetId);
+            if (targetView) targetView.classList.add('active');
+        });
+    });
+
+    // 4. Tìm kiếm hàm theo thời gian thực
+    if (funcSearchInput) {
+        funcSearchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            const cards = functionsContainer.querySelectorAll('.function-card');
+            cards.forEach(card => {
+                const name = card.getAttribute('data-name').toLowerCase();
+                const cat = card.getAttribute('data-category').toLowerCase();
+                const text = card.textContent.toLowerCase();
+                if (name.includes(query) || cat.includes(query) || text.includes(query)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    // 5. Cập nhật giao diện bài tập hiện tại
+    window.renderExerciseDetails = function(ex) {
+        currentExercise = ex;
+        if (!ex) return;
+
+        // Cập nhật header
+        const topTitle = document.getElementById('topExerciseTitle');
+        const topDiff = document.getElementById('topExerciseDiff');
+        if (topTitle) topTitle.textContent = ex.title;
+        if (topDiff) {
+            topDiff.textContent = ex.difficulty;
+            topDiff.className = `badge-difficulty badge-${ex.difficulty}`;
+        }
+
+        // Cập nhật tab Đề bài (nếu mở tab Đề bài)
+        const problemTitle = document.getElementById('problemTitle');
+        const problemDesc = document.getElementById('problemDesc');
+        const problemHint = document.getElementById('problemHint');
+        if (problemTitle) problemTitle.textContent = ex.title;
+        if (problemDesc) problemDesc.textContent = ex.description;
+        if (problemHint) problemHint.textContent = ex.hint || ex.solution_hint || 'Không có gợi ý.';
+
+        // Cập nhật Allowed functions chips
+        const allowed = ex.allowedFunctions || ex.allowed_functions || [];
+        if (problemAllowedChips) {
+            problemAllowedChips.innerHTML = allowed.map(fn => `<span class="func-chip">${escapeHtml(fn)}()</span>`).join('');
+        }
+        if (allowedFuncsList) {
+            allowedFuncsList.innerHTML = allowed.length > 0
+                ? `Bài này chỉ được phép dùng: <strong>${allowed.join(', ')}</strong>`
+                : 'Bài tập cho phép sử dụng các hàm cơ bản.';
+        }
+
+        // Cập nhật khung đề bài nội tuyến (Inline Problem Drawer) ngay dưới bài tập được chọn
+        document.querySelectorAll('.inline-problem-panel').forEach(p => {
+            p.classList.add('collapsed');
+        });
+        document.querySelectorAll('.btn-toggle-problem .toggle-text').forEach(t => {
+            t.textContent = 'Xem đề';
+        });
+
+        const activeDrawer = document.getElementById(`inlineProblem-${ex.id}`);
+        const activeItem = document.getElementById(`exercise-item-${ex.id}`);
+        if (activeDrawer && activeItem) {
+            let chipsHtml = '';
+            if (allowed.length > 0) {
+                chipsHtml = `
+                    <div class="inline-section-title">Hàm cho phép:</div>
+                    <div class="chip-container">
+                        ${allowed.map(fn => `<span class="func-chip">${escapeHtml(fn)}()</span>`).join('')}
+                    </div>
+                `;
+            }
+
+            let hintHtml = '';
+            const hint = ex.hint || ex.solution_hint;
+            if (hint) {
+                hintHtml = `<div class="inline-hint-box"><strong>Gợi ý:</strong> ${escapeHtml(hint)}</div>`;
+            }
+
+            activeDrawer.innerHTML = `
+                <div class="inline-problem-desc">${escapeHtml(ex.description)}</div>
+                ${chipsHtml}
+                ${hintHtml}
+            `;
+            activeDrawer.classList.remove('collapsed');
+
+            const btn = activeItem.querySelector('.btn-toggle-problem');
+            if (btn) {
+                btn.querySelector('.toggle-text').textContent = 'Ẩn đề';
+            }
+        }
+
+        // Đặt lại mã nguồn
+        codeEditor.value = ex.initialCode || ex.initial_code || '';
+        dirtyIndicator.style.display = 'none';
+        updateLineNumbers();
+        updateHighlighting();
+    };
+
+    // Chuyển đổi trạng thái Ẩn/Hiện đề bài nội tuyến
+    window.toggleProblemDrawer = function(event, id) {
+        if (event) event.stopPropagation();
+        const drawer = document.getElementById(`inlineProblem-${id}`);
+        const item = document.getElementById(`exercise-item-${id}`);
+        if (!drawer || !item) return;
+
+        const btn = item.querySelector('.btn-toggle-problem');
+        const isCollapsed = drawer.classList.toggle('collapsed');
+
+        if (btn) {
+            btn.querySelector('.toggle-text').textContent = isCollapsed ? 'Xem đề' : 'Ẩn đề';
+        }
+    };
+
+    // 6. Tải bài tập khi người dùng bấm chọn
+    window.loadExercise = function(id) {
+        fetch(`/api/exercise?id=${id}`)
+            .then(res => res.json())
+            .then(ex => {
+                // Cập nhật danh sách active
+                document.querySelectorAll('.exercise-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (parseInt(item.getAttribute('data-id')) === id) {
+                        item.classList.add('active');
+                    }
+                });
+                renderExerciseDetails(ex);
+            })
+            .catch(err => {
+                console.error('Lỗi khi nạp bài tập:', err);
+            });
+    };
+
+    // 7. Chạy mã Python
+    function runCode() {
+        const code = codeEditor.value;
+        const allowed = currentExercise ? (currentExercise.allowedFunctions || currentExercise.allowed_functions || []) : [];
+
+        // Chuyển sang tab console
+        document.querySelector('.console-tab[data-target="consoleOutput"]').click();
+
+        // Xóa console cũ trước khi thực thi
+        outputLog.textContent = '';
+        execStatus.textContent = "Đang chạy...";
+        execStatus.style.color = "var(--accent-amber)";
+
+        // Bước 1: Kiểm tra Whitelist giới hạn hàm
+        const check = PythonEngine.validateCode(code, allowed);
+        if (!check.isValid) {
+            outputLog.innerHTML = `<span class="log-stderr">${check.errorMsg}</span>\n`;
+            execStatus.textContent = "Bị chặn bởi quy tắc";
+            execStatus.style.color = "var(--accent-red)";
+            return;
+        }
+
+        // Bước 2: Thực thi chương trình
+        PythonEngine.runPython(
+            code,
+            function(out) {
+                // Stream output trực tiếp vào console
+                outputLog.appendChild(document.createTextNode(out));
+                outputLog.scrollTop = outputLog.scrollHeight;
+            },
+            function(err) {
+                const errSpan = document.createElement('span');
+                errSpan.className = 'log-stderr';
+                errSpan.textContent = `\nTraceback (most recent call last):\n  ${err}\n`;
+                outputLog.appendChild(errSpan);
+            },
+            function(success, duration) {
+                const footer = document.createElement('span');
+                footer.className = success ? 'log-system' : 'log-stderr';
+                footer.textContent = `\n--------------------------------\nProcess finished with exit code ${success ? '0' : '1'} (${duration}ms)\n`;
+                outputLog.appendChild(footer);
+
+                execStatus.textContent = success ? "Hoàn tất" : "Lỗi";
+                execStatus.style.color = success ? "var(--accent-emerald)" : "var(--accent-red)";
+            }
+        );
+    }
+
+    // 8. Chấm thử (Test Cases)
+    function runTests() {
+        const code = codeEditor.value;
+        const allowed = currentExercise ? (currentExercise.allowedFunctions || currentExercise.allowed_functions || []) : [];
+
+        // Mở tab Test Cases
+        document.querySelector('.console-tab[data-target="testResults"]').click();
+
+        // Kiểm tra whitelist
+        const check = PythonEngine.validateCode(code, allowed);
+        if (!check.isValid) {
+            testCasesContainer.innerHTML = `<div class="testcase-item fail">
+                <div class="tc-header tc-fail">Quy tắc không hợp lệ</div>
+                <div class="tc-detail">${check.errorMsg}</div>
+            </div>`;
+            return;
+        }
+
+        let testCases = [];
+        try {
+            const raw = currentExercise.testCasesJSON || currentExercise.test_cases_json || currentExercise.test_cases || "[]";
+            testCases = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch (e) {
+            testCases = [];
+        }
+
+        testCasesContainer.innerHTML = `<div class="empty-state">Đang chạy kiểm thử qua các test cases...</div>`;
+
+        PythonEngine.runTests(
+            code,
+            testCases,
+            null,
+            function(results, passCount, totalCount) {
+                testPassCount.textContent = `${passCount}/${totalCount}`;
+                testPassCount.style.color = (passCount === totalCount && totalCount > 0) ? "var(--accent-emerald)" : "var(--accent-amber)";
+
+                if (results.length === 0) {
+                    testCasesContainer.innerHTML = `<div class="empty-state">Bài này không có test cases định sẵn.</div>`;
+                    return;
+                }
+
+                testCasesContainer.innerHTML = results.map(r => `
+                    <div class="testcase-item ${r.passed ? 'pass' : 'fail'}">
+                        <div class="tc-header">
+                            <span>Test Case #${r.index}</span>
+                            <span class="${r.passed ? 'tc-pass' : 'tc-fail'}">${r.passed ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (FAIL)'}</span>
+                        </div>
+                        <div class="tc-detail"><strong>Đầu vào:</strong> <code>${escapeHtml(r.input)}</code></div>
+                        <div class="tc-detail"><strong>Kỳ vọng:</strong> <code>${escapeHtml(r.expected)}</code></div>
+                        <div class="tc-detail"><strong>Thực tế trả về:</strong> <code class="${r.passed ? 'tc-pass' : 'tc-fail'}">${escapeHtml(r.actual)}</code></div>
+                    </div>
+                `).join('');
+            }
+        );
+    }
+
+    // Event Listeners
+    btnRunCode.addEventListener('click', runCode);
+    btnRunTests.addEventListener('click', runTests);
+
+    btnResetCode.addEventListener('click', function() {
+        if (currentExercise) {
+            if (confirm("Bạn có chắc chắn muốn đặt lại mã nguồn về trạng thái ban đầu?")) {
+                codeEditor.value = currentExercise.initialCode || currentExercise.initial_code || '';
+                updateLineNumbers();
+                updateHighlighting();
+                dirtyIndicator.style.display = 'none';
+            }
+        }
+    });
+
+    btnClearConsole.addEventListener('click', function() {
+        outputLog.textContent = '';
+        execStatus.textContent = "Sẵn sàng";
+        execStatus.style.color = "var(--accent-emerald)";
+    });
+
+    // 9. Kéo co giãn thanh bên trái (Resizable Sidebar)
+    if (sidebarResizer && ideSidebar) {
+        // Phục hồi kích thước đã lưu
+        const savedWidth = localStorage.getItem('algodb_sidebar_width');
+        if (savedWidth) {
+            ideSidebar.style.width = savedWidth;
+        }
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        sidebarResizer.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = ideSidebar.getBoundingClientRect().width;
+            sidebarResizer.classList.add('is-resizing');
+            document.body.classList.add('is-resizing');
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isResizing) return;
+            const deltaX = e.clientX - startX;
+            let newWidth = startWidth + deltaX;
+
+            const minWidth = 220;
+            const maxWidth = Math.round(window.innerWidth * 0.7);
+
+            if (newWidth < minWidth) newWidth = minWidth;
+            if (newWidth > maxWidth) newWidth = maxWidth;
+
+            ideSidebar.style.width = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (isResizing) {
+                isResizing = false;
+                sidebarResizer.classList.remove('is-resizing');
+                document.body.classList.remove('is-resizing');
+                localStorage.setItem('algodb_sidebar_width', ideSidebar.style.width);
+            }
+        });
+    }
+
+    // 10. Tăng/giảm cỡ chữ hiển thị (Font Size Controls)
+    let currentFontSize = parseInt(localStorage.getItem('algodb_font_size'), 10) || 13;
+
+    function applyFontSize(size) {
+        if (size < 11) size = 11;
+        if (size > 24) size = 24;
+        currentFontSize = size;
+
+        const lineHeight = Math.round(size * 1.54);
+        codeEditor.style.fontSize = size + 'px';
+        codeEditor.style.lineHeight = lineHeight + 'px';
+        lineNumbers.style.fontSize = size + 'px';
+        lineNumbers.style.lineHeight = lineHeight + 'px';
+        if (highlighting) {
+            highlighting.style.fontSize = size + 'px';
+            highlighting.style.lineHeight = lineHeight + 'px';
+        }
+
+        if (outputLog) {
+            outputLog.style.fontSize = Math.max(11, size - 1) + 'px';
+            outputLog.style.lineHeight = Math.max(16, lineHeight - 2) + 'px';
+        }
+
+        if (fontSizeDisplay) {
+            fontSizeDisplay.textContent = size + 'px';
+        }
+
+        localStorage.setItem('algodb_font_size', size);
+        updateLineNumbers();
+    }
+
+    if (btnFontDec) {
+        btnFontDec.addEventListener('click', function() {
+            applyFontSize(currentFontSize - 1);
+        });
+    }
+
+    if (btnFontInc) {
+        btnFontInc.addEventListener('click', function() {
+            applyFontSize(currentFontSize + 1);
+        });
+    }
+
+    // Áp dụng cỡ chữ ban đầu
+    applyFontSize(currentFontSize);
+
+    // ==========================================================================
+    // 11. Chế độ thi & Chống gian lận (Exam Mode & Anti-Cheating)
+    // ==========================================================================
+    let isExamMode = false;
+    let isExamSuspended = false;
+    let antiCheatMonitoring = false;
+    let examTimerInterval = null;
+    let examSecondsRemaining = 45 * 60; // Mặc định thời gian làm bài: 45 phút
+
+    function formatTime(totalSeconds) {
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function enterFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            return el.requestFullscreen();
+        } else if (el.webkitRequestFullscreen) {
+            return el.webkitRequestFullscreen();
+        } else if (el.mozRequestFullScreen) {
+            return el.mozRequestFullScreen();
+        } else if (el.msRequestFullscreen) {
+            return el.msRequestFullscreen();
+        }
+        return Promise.resolve();
+    }
+
+    function suspendExam(reason) {
+        if (!isExamMode || isExamSuspended) return;
+        isExamSuspended = true;
+        antiCheatMonitoring = false;
+
+        if (examTimerInterval) {
+            clearInterval(examTimerInterval);
+            examTimerInterval = null;
+        }
+
+        // Khóa hoàn toàn trình soạn thảo
+        codeEditor.readOnly = true;
+        codeEditor.disabled = true;
+
+        // Vô hiệu hóa toàn bộ nút thao tác
+        if (btnRunCode) btnRunCode.disabled = true;
+        if (btnRunTests) btnRunTests.disabled = true;
+        if (btnResetCode) btnResetCode.disabled = true;
+        if (btnStartExam) {
+            btnStartExam.disabled = true;
+            btnStartExam.innerHTML = '<span class="icon">&#9888;</span> Bị đình chỉ';
+        }
+
+        // Cập nhật trạng thái và terminal console
+        if (execStatus) {
+            execStatus.textContent = "Đình chỉ thi (Gian lận)";
+            execStatus.style.color = "var(--accent-red)";
+        }
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('vi-VN') + ' ngày ' + now.toLocaleDateString('vi-VN');
+
+        if (outputLog) {
+            const warnBlock = document.createElement('div');
+            warnBlock.className = 'log-stderr';
+            warnBlock.style.padding = '10px';
+            warnBlock.style.border = '1px solid #ef4444';
+            warnBlock.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            warnBlock.style.marginTop = '10px';
+            warnBlock.innerHTML = `\n[CẢNH BÁO HỆ THỐNG]\nBÀI THI ĐÃ BỊ ĐÌNH CHỈ DO GIAN LẬN!\n- Lý do vi phạm: ${escapeHtml(reason)}\n- Thời điểm: ${timeStr}\n- Toàn bộ thao tác chạy mã, chấm điểm và sửa đổi đã bị vô hiệu hóa vĩnh viễn.\n`;
+            outputLog.appendChild(warnBlock);
+            outputLog.scrollTop = outputLog.scrollHeight;
+        }
+
+        // Kích hoạt overlay cảnh báo toàn màn hình
+        if (suspendedReason) {
+            suspendedReason.textContent = reason;
+        }
+        if (suspendedTime) {
+            suspendedTime.textContent = 'Thời điểm vi phạm: ' + timeStr;
+        }
+        if (examSuspendedOverlay) {
+            examSuspendedOverlay.style.display = 'flex';
+        }
+    }
+
+    function startExamMode() {
+        const confirmMsg = "QUY CHẾ PHÒNG THI TRỰC TUYẾN:\n\n" +
+            "1. Hệ thống sẽ tự động chuyển sang chế độ TOÀN MÀN HÌNH (Fullscreen).\n" +
+            "2. Tuyệt đối KHÔNG SAO CHÉP / DÁN (Copy/Paste), không mở chuột phải hoặc dùng DevTools.\n" +
+            "3. Tuyệt đối KHÔNG CHUYỂN TAB, KHÔNG THOÁT TOÀN MÀN HÌNH HOẶC RỜI CỬA SỔ LÀM BÀI.\n" +
+            "Mọi hành vi mất tiêu điểm/nhảy trang sẽ lập tức bị hệ thống XÁC ĐỊNH LÀ GIAN LẬN và ĐÌNH CHỈ THI.\n\n" +
+            "Bạn có chắc chắn muốn bắt đầu làm bài thi ngay bây giờ?";
+
+        if (!confirm(confirmMsg)) return;
+
+        isExamMode = true;
+        isExamSuspended = false;
+
+        // Bật toàn màn hình
+        enterFullscreen().catch(err => {
+            console.warn("Fullscreen request:", err);
+        });
+
+        document.body.classList.add('exam-mode-active');
+
+        if (btnStartExam) {
+            btnStartExam.disabled = true;
+            btnStartExam.innerHTML = '<span class="icon">&#128274;</span> Đang trong kỳ thi';
+        }
+
+        if (examModeContainer) {
+            examModeContainer.style.display = 'flex';
+        }
+
+        if (examTimer) {
+            examTimer.textContent = formatTime(examSecondsRemaining);
+        }
+
+        // Bắt đầu đếm ngược thời gian làm bài
+        examTimerInterval = setInterval(function() {
+            examSecondsRemaining--;
+
+            if (examTimer) {
+                examTimer.textContent = formatTime(examSecondsRemaining);
+                if (examSecondsRemaining <= 300) {
+                    examTimer.classList.add('urgent');
+                }
+            }
+
+            if (examSecondsRemaining <= 0) {
+                clearInterval(examTimerInterval);
+                examTimerInterval = null;
+                codeEditor.readOnly = true;
+                if (btnRunCode) btnRunCode.disabled = true;
+                if (btnRunTests) btnRunTests.disabled = true;
+                alert("HẾT GIỜ LÀM BÀI! Hệ thống đã tự động khóa bài thi.");
+            }
+        }, 1000);
+
+        // Kích hoạt giám sát chống gian lận sau 1000ms để trình duyệt chuyển toàn màn hình ổn định
+        setTimeout(function() {
+            antiCheatMonitoring = true;
+        }, 1000);
+    }
+
+    if (btnStartExam) {
+        btnStartExam.addEventListener('click', startExamMode);
+    }
+
+    // 1. Chặn Copy, Cut, Paste, Chuột phải
+    ['copy', 'cut', 'paste', 'contextmenu'].forEach(eventType => {
+        window.addEventListener(eventType, function(e) {
+            if (isExamMode && !isExamSuspended) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    });
+
+    // 2. Chặn các phím tắt gian lận (Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+U, F12, Ctrl+Shift+I/J/C)
+    window.addEventListener('keydown', function(e) {
+        if (!isExamMode || isExamSuspended) return;
+
+        if (e.key === 'F12') {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+
+        const isCtrl = e.ctrlKey || e.metaKey;
+        if (isCtrl) {
+            const k = (e.key || '').toLowerCase();
+            // Cấm Copy, Paste, Cut, View Source (U), Print (P), Save (S)
+            if (['c', 'v', 'x', 'u', 'p', 's'].includes(k)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+
+            // Cấm mở Developer Tools: Ctrl + Shift + I/J/C
+            if (e.shiftKey && ['i', 'j', 'c'].includes(k)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+        }
+    }, true);
+
+    // 3. Phát hiện chuyển tab hoặc rời trang (visibilitychange)
+    document.addEventListener('visibilitychange', function() {
+        if (isExamMode && !isExamSuspended && antiCheatMonitoring) {
+            if (document.hidden || document.visibilityState === 'hidden') {
+                suspendExam('Phát hiện rời khỏi trang thi hoặc chuyển sang tab khác (Visibility Hidden).');
+            }
+        }
+    });
+
+    // 4. Phát hiện mất tiêu điểm màn hình (blur / mất focus cửa sổ)
+    window.addEventListener('blur', function() {
+        if (isExamMode && !isExamSuspended && antiCheatMonitoring) {
+            suspendExam('Phát hiện mất tiêu điểm màn hình làm bài / chuyển sang ứng dụng khác (Window Blur).');
+        }
+    });
+
+    // 5. Phát hiện thoát khỏi chế độ toàn màn hình
+    const handleFullscreenChange = function() {
+        if (isExamMode && !isExamSuspended && antiCheatMonitoring) {
+            const isFullscreen = document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement ||
+                document.msFullscreenElement;
+            if (!isFullscreen) {
+                suspendExam('Phát hiện hành vi thoát khỏi chế độ toàn màn hình.');
+            }
+        }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    // Khởi tạo bài tập đầu tiên
+    if (window.INITIAL_EXERCISE) {
+        renderExerciseDetails(window.INITIAL_EXERCISE);
+    }
+    updateLineNumbers();
+});

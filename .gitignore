@@ -1,0 +1,5 @@
+# Binaries & database
+bin/
+data/Database/*.db
+data/Database/*.db-journal
+.env.local
