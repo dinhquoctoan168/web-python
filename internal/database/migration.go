@@ -314,6 +314,45 @@ var migrations = []Migration{
 			return err
 		},
 	},
+	{
+		Version: 8,
+		Name:    "submissions",
+		Up: func(tx *sql.Tx) error {
+			queries := []string{
+				`CREATE TABLE IF NOT EXISTS submissions (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					student_id INTEGER NOT NULL,
+					exercise_id INTEGER NOT NULL,
+					source_code TEXT NOT NULL,
+					score REAL DEFAULT 0,
+					passed_tests INTEGER DEFAULT 0,
+					total_tests INTEGER DEFAULT 0,
+					status TEXT,
+					submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY(student_id) REFERENCES users(id),
+					FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+				);`,
+				`CREATE TABLE IF NOT EXISTS exercise_attempts (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					student_id INTEGER NOT NULL,
+					exercise_id INTEGER NOT NULL,
+					started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					ended_at DATETIME,
+					run_count INTEGER DEFAULT 0,
+					test_count INTEGER DEFAULT 0,
+					hint_count INTEGER DEFAULT 0,
+					FOREIGN KEY(student_id) REFERENCES users(id),
+					FOREIGN KEY(exercise_id) REFERENCES exercises(id)
+				);`,
+			}
+			for _, q := range queries {
+				if _, err := tx.Exec(q); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

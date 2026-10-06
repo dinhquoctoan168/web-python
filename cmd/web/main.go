@@ -21,6 +21,7 @@ import (
 	"web_python/internal/frontend"
 	"web_python/internal/lesson"
 	"web_python/internal/practice"
+	"web_python/internal/submission"
 )
 
 // loadEnv đọc tệp cấu hình .env thủ công bằng standard library để không phụ thuộc lib ngoài
@@ -103,6 +104,10 @@ func main() {
 	practiceService := practice.NewService(practiceRepo)
 	practiceHandler := practice.NewHandler(practiceService)
 
+	submissionRepo := submission.NewRepository(db)
+	submissionService := submission.NewService(submissionRepo)
+	submissionHandler := submission.NewHandler(submissionService)
+
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {
 		return lessonService.GetCurriculum(courseID, isTeacher)
@@ -153,6 +158,9 @@ func main() {
 	mux.HandleFunc("/teacher/lesson/edit", auth.RequireTeacher(lessonHandler.HandleTeacherEditLessonForm))
 	mux.HandleFunc("/teacher/lesson/update", auth.RequireTeacher(lessonHandler.HandleTeacherUpdateLesson))
 
+	mux.HandleFunc("/teacher/submissions", auth.RequireTeacher(submissionHandler.HandleTeacherSubmissions))
+	mux.HandleFunc("/teacher/submission/view", auth.RequireTeacher(submissionHandler.HandleTeacherSubmissionView))
+
 	// Trang giao diện IDE (yêu cầu đăng nhập)
 	mux.HandleFunc("/ide", auth.RequireLogin(frontend.HandleIDE))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -174,6 +182,9 @@ func main() {
 	mux.HandleFunc("/api/practice/submit", practiceHandler.HandleSubmitPractice)
 	mux.HandleFunc("/api/practice/state", practiceHandler.HandleGetState)
 	mux.HandleFunc("/api/practice/all-states", practiceHandler.HandleGetAllStates)
+	mux.HandleFunc("/api/attempt/action", auth.RequireLogin(submissionHandler.HandleRecordAction))
+	mux.HandleFunc("/api/submissions", auth.RequireLogin(submissionHandler.HandleCreateSubmission))
+	mux.HandleFunc("/api/submissions/my", auth.RequireLogin(submissionHandler.HandleGetMySubmissions))
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware
 	rootHandler := authMiddleware.AuthenticateMiddleware(mux)

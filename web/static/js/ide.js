@@ -178,6 +178,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Ghi nhận hành động học tập (run, test, hint) - Phase 8: Attempt Metrics
+    function recordAttemptAction(action) {
+        if (!currentExercise) return;
+        fetch('/api/attempt/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ exercise_id: currentExercise.id, action: action })
+        }).catch(err => console.error('Lỗi ghi nhận action metric:', err));
+    }
+
+    // Lưu bản ghi lịch sử nộp bài chính thức - Phase 8: Submissions
+    function createSubmission(exerciseId, code, score, passedTests, totalTests) {
+        fetch('/api/submissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                exercise_id: exerciseId,
+                source_code: code,
+                score: score,
+                passed_tests: passedTests,
+                total_tests: totalTests
+            })
+        }).catch(err => console.error('Lỗi lưu submission:', err));
+    }
+
     // Bộ phân tích cú pháp và tô màu mã Python (Python Syntax Highlighter)
     function highlightPython(code) {
         if (!code) return '';
@@ -299,6 +324,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const targetId = this.getAttribute('data-tab');
             const targetContent = document.getElementById(targetId);
             if (targetContent) targetContent.classList.add('active');
+
+            if (targetId === 'tab-problem') {
+                recordAttemptAction('hint');
+            }
         });
     });
 
@@ -429,6 +458,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (btn) {
             btn.querySelector('.toggle-text').textContent = isCollapsed ? 'Xem đề' : 'Ẩn đề';
         }
+        if (!isCollapsed) {
+            recordAttemptAction('hint');
+        }
     };
 
     // 6. Tải bài tập khi người dùng bấm chọn
@@ -452,6 +484,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 7. Chạy mã Python
     function runCode() {
+        recordAttemptAction('run');
         const code = codeEditor.value;
         const allowed = currentExercise ? (currentExercise.allowedFunctions || currentExercise.allowed_functions || []) : [];
 
@@ -500,6 +533,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 8. Chấm thử (Test Cases)
     function runTests() {
+        recordAttemptAction('test');
         const code = codeEditor.value;
         const allowed = currentExercise ? (currentExercise.allowedFunctions || currentExercise.allowed_functions || []) : [];
 
@@ -551,11 +585,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 `).join('');
 
-                // Ghi nhận kết quả luyện tập vào cơ sở dữ liệu (Phase 7: Student Practice)
+                // Ghi nhận kết quả luyện tập vào cơ sở dữ liệu (Phase 7: Practice & Phase 8: Submission)
                 if (currentExercise && totalCount > 0) {
                     const passed = (passCount === totalCount);
                     const score = (passCount / totalCount) * 100;
                     submitPracticeResult(currentExercise.id, code, score, passed);
+                    createSubmission(currentExercise.id, code, score, passCount, totalCount);
                 }
             }
         );

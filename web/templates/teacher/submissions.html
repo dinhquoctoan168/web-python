@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch sử làm bài & Nộp bài - Giảng viên</title>
+    <link rel="stylesheet" href="/static/css/class.css">
+    <style>
+        .metric-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px 20px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent-blue, #61afef);
+            margin: 8px 0;
+        }
+        .metric-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .code-view {
+            background-color: var(--bg-main, #1e1e1e);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            color: #d4d4d4;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            line-height: 1.5;
+            margin-top: 12px;
+        }
+        .badge-pass { background-color: rgba(78, 201, 176, 0.15); color: #4ec9b0; border: 1px solid #4ec9b0; }
+        .badge-fail { background-color: rgba(244, 71, 71, 0.15); color: #f44747; border: 1px solid #f44747; }
+        .badge-partial { background-color: rgba(229, 192, 123, 0.15); color: #e5c07b; border: 1px solid #e5c07b; }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <a href="/courses" class="nav-brand">
+            <span>&#128187;</span>
+            <span>Web Python <strong>Platform</strong></span>
+        </a>
+        <nav class="nav-links">
+            <a href="/courses">Môn học</a>
+            <a href="/teacher/courses">Quản lý Môn</a>
+            <a href="/teacher/classes">Quản lý Lớp</a>
+            <a href="/teacher/submissions" class="active">Lịch sử nộp bài</a>
+            <a href="/ide">Luyện tập (IDE)</a>
+        </nav>
+        <div class="nav-user">
+            {{ if .User }}
+                <span>{{ .User.FullName }}</span>
+                <span class="badge-role">{{ .User.Role }}</span>
+                <form action="/logout" method="POST" style="display:inline;">
+                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
+                </form>
+            {{ end }}
+        </div>
+    </header>
+
+    <main class="container">
+        {{ if .Submission }}
+            <!-- Xem chi tiết 1 bài nộp -->
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Chi tiết Bài nộp #{{ .Submission.ID }}</h1>
+                    <p class="page-subtitle">Sinh viên: <strong>{{ .Submission.StudentName }}</strong> | Bài tập: <strong>{{ .Submission.ExerciseTitle }}</strong></p>
+                </div>
+                <div>
+                    <a href="/teacher/submissions" class="btn btn-secondary">&larr; Quay lại danh sách</a>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 20px;">
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 16px;">
+                    <div>Điểm: <strong style="font-size: 18px; color: #4ec9b0;">{{ printf "%.1f" .Submission.Score }}</strong></div>
+                    <div>Số test đạt: <strong>{{ .Submission.PassedTests }} / {{ .Submission.TotalTests }}</strong></div>
+                    <div>Trạng thái: 
+                        <span class="meta-badge {{ if eq .Submission.Status "pass" }}badge-pass{{ else if eq .Submission.Status "partial" }}badge-partial{{ else }}badge-fail{{ end }}">
+                            {{ .Submission.Status }}
+                        </span>
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 13px;">Thời gian: {{ .Submission.SubmittedAt.Format "02/01/2006 15:04:05" }}</div>
+                </div>
+
+                <h3>Mã nguồn sinh viên đã nộp:</h3>
+                <pre class="code-view">{{ .Submission.SourceCode }}</pre>
+            </div>
+
+        {{ else if .History }}
+            <!-- Xem lịch sử nỗ lực và bài nộp của sinh viên -->
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Lịch sử làm bài: {{ .History.StudentName }}</h1>
+                    <p class="page-subtitle">Bài tập: <strong>{{ .History.ExerciseTitle }}</strong> (Tài khoản: {{ .History.Username }})</p>
+                </div>
+                <div>
+                    <a href="/teacher/submissions" class="btn btn-secondary">&larr; Quay lại</a>
+                </div>
+            </div>
+
+            <!-- Thẻ chỉ số nỗ lực (Metrics) -->
+            {{ if .History.Attempt }}
+            <div class="metric-cards">
+                <div class="metric-card">
+                    <div class="metric-label">Số lần Chạy mã (Run)</div>
+                    <div class="metric-value">{{ .History.Attempt.RunCount }}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Thử nghiệm mã trên console</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Số lần Chấm thử (Test)</div>
+                    <div class="metric-value">{{ .History.Attempt.TestCount }}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Chạy qua bộ kiểm thử</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Số lần Xem gợi ý (Hint)</div>
+                    <div class="metric-value">{{ .History.Attempt.HintCount }}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Mở bảng gợi ý thuật toán</div>
+                </div>
+            </div>
+            {{ end }}
+
+            <!-- Danh sách các lần nộp bài -->
+            <div class="card" style="padding: 20px;">
+                <h3 style="margin-bottom: 16px;">Các lượt nộp bài của sinh viên ({{ len .History.Submissions }} lần)</h3>
+                {{ if .History.Submissions }}
+                <table class="table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
+                            <th style="padding: 10px;">ID</th>
+                            <th style="padding: 10px;">Thời gian</th>
+                            <th style="padding: 10px;">Điểm số</th>
+                            <th style="padding: 10px;">Test cases</th>
+                            <th style="padding: 10px;">Trạng thái</th>
+                            <th style="padding: 10px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .History.Submissions }}
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 10px;">#{{ .ID }}</td>
+                            <td style="padding: 10px;">{{ .SubmittedAt.Format "02/01/2006 15:04:05" }}</td>
+                            <td style="padding: 10px; font-weight: bold; color: #4ec9b0;">{{ printf "%.1f" .Score }}</td>
+                            <td style="padding: 10px;">{{ .PassedTests }}/{{ .TotalTests }}</td>
+                            <td style="padding: 10px;">
+                                <span class="meta-badge {{ if eq .Status "pass" }}badge-pass{{ else if eq .Status "partial" }}badge-partial{{ else }}badge-fail{{ end }}">
+                                    {{ .Status }}
+                                </span>
+                            </td>
+                            <td style="padding: 10px;">
+                                <a href="/teacher/submission/view?id={{ .ID }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Xem mã nguồn</a>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+                {{ else }}
+                    <p style="color: var(--text-muted);">Sinh viên chưa thực hiện lượt nộp bài nào.</p>
+                {{ end }}
+            </div>
+
+        {{ else }}
+            <!-- Danh sách toàn bộ bài nộp -->
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Theo dõi Lịch sử Nộp bài & Nỗ lực học tập</h1>
+                    <p class="page-subtitle">Xem chi tiết các lượt nộp bài, tần suất thử nghiệm (Run, Test, Hint) của sinh viên.</p>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 20px;">
+                {{ if .Submissions }}
+                <table class="table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
+                            <th style="padding: 10px;">Sinh viên</th>
+                            <th style="padding: 10px;">Bài tập</th>
+                            <th style="padding: 10px;">Điểm</th>
+                            <th style="padding: 10px;">Test</th>
+                            <th style="padding: 10px;">Trạng thái</th>
+                            <th style="padding: 10px;">Thời gian nộp</th>
+                            <th style="padding: 10px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Submissions }}
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 10px;"><strong>{{ .StudentName }}</strong></td>
+                            <td style="padding: 10px;">{{ .ExerciseTitle }}</td>
+                            <td style="padding: 10px; font-weight: bold; color: #4ec9b0;">{{ printf "%.1f" .Score }}</td>
+                            <td style="padding: 10px;">{{ .PassedTests }}/{{ .TotalTests }}</td>
+                            <td style="padding: 10px;">
+                                <span class="meta-badge {{ if eq .Status "pass" }}badge-pass{{ else if eq .Status "partial" }}badge-partial{{ else }}badge-fail{{ end }}">
+                                    {{ .Status }}
+                                </span>
+                            </td>
+                            <td style="padding: 10px; color: var(--text-muted); font-size: 13px;">{{ .SubmittedAt.Format "02/01 15:04" }}</td>
+                            <td style="padding: 10px;">
+                                <a href="/teacher/submission/view?id={{ .ID }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Xem mã</a>
+                                <a href="/teacher/submissions?student_id={{ .StudentID }}&exercise_id={{ .ExerciseID }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;">Nỗ lực & Lịch sử</a>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+                {{ else }}
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <p>Chưa có dữ liệu nộp bài nào được ghi nhận từ sinh viên.</p>
+                    </div>
+                {{ end }}
+            </div>
+        {{ end }}
+    </main>
+</body>
+</html>
