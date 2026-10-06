@@ -449,6 +449,22 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 11,
+		Name:    "exam_events",
+		Up: func(tx *sql.Tx) error {
+			query := `CREATE TABLE IF NOT EXISTS exam_events (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				session_id INTEGER NOT NULL,
+				event_type TEXT NOT NULL,
+				event_data TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY(session_id) REFERENCES exam_sessions(id)
+			);`
+			_, err := tx.Exec(query)
+			return err
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

@@ -179,6 +179,7 @@ func main() {
 	mux.HandleFunc("/teacher/exam/new", auth.RequireTeacher(examHandler.HandleTeacherNewExamForm))
 	mux.HandleFunc("/teacher/exam/create", auth.RequireTeacher(examHandler.HandleTeacherCreateExam))
 	mux.HandleFunc("/teacher/exam/publish", auth.RequireTeacher(examHandler.HandleTeacherPublishExam))
+	mux.HandleFunc("/teacher/exam/monitoring", auth.RequireTeacher(examHandler.HandleTeacherExamMonitoring))
 
 	mux.HandleFunc("/teacher/curriculum", auth.RequireTeacher(lessonHandler.HandleTeacherCurriculum))
 	mux.HandleFunc("/teacher/chapter/create", auth.RequireTeacher(lessonHandler.HandleTeacherCreateChapter))
@@ -217,6 +218,7 @@ func main() {
 	mux.HandleFunc("/api/submissions/my", auth.RequireLogin(submissionHandler.HandleGetMySubmissions))
 	mux.HandleFunc("/api/exam/save-answer", auth.RequireLogin(examHandler.HandleAPISaveAnswer))
 	mux.HandleFunc("/api/exam/submit", auth.RequireLogin(examHandler.HandleAPISubmitExam))
+	mux.HandleFunc("/api/exam/event", auth.RequireLogin(examHandler.HandleAPIRecordExamEvent))
 
 	// Bọc toàn bộ handler với AuthenticateMiddleware
 	rootHandler := authMiddleware.AuthenticateMiddleware(mux)

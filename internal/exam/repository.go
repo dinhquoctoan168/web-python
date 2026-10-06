@@ -338,3 +338,84 @@ func (r *Repository) SubmitSession(sessionID int, finalScore float64) error {
 	_, err := r.db.Exec(query, now, finalScore, sessionID)
 	return err
 }
+
+// RecordEvent ghi nhận sự kiện giám sát phòng thi
+func (r *Repository) RecordEvent(sessionID int, eventType, eventData string) error {
+	query := `INSERT INTO exam_events (session_id, event_type, event_data, created_at) VALUES (?, ?, ?, ?)`
+	_, err := r.db.Exec(query, sessionID, eventType, eventData, time.Now())
+	return err
+}
+
+// GetExamMonitoringReport tổng hợp báo cáo giám sát tất cả thí sinh trong kỳ thi
+func (r *Repository) GetExamMonitoringReport(examID int) ([]StudentMonitoringSummary, error) {
+	query := `SELECT s.id, s.student_id, u.full_name, s.status, s.final_score
+		FROM exam_sessions s
+		JOIN users u ON s.student_id = u.id
+		WHERE s.exam_id = ?
+		ORDER BY s.started_at ASC`
+
+	rows, err := r.db.Query(query, examID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var summaries []StudentMonitoringSummary
+	for rows.Next() {
+		var sum StudentMonitoringSummary
+		if err := rows.Scan(&sum.SessionID, &sum.StudentID, &sum.StudentName, &sum.SessionStatus, &sum.FinalScore); err != nil {
+			return nil, err
+		}
+		summaries = append(summaries, sum)
+	}
+	rows.Close()
+
+	// Tổng hợp số lượng vi phạm cho từng phiên
+	for i := range summaries {
+		sID := summaries[i].SessionID
+
+		countsQuery := `SELECT event_type, COUNT(*) FROM exam_events WHERE session_id = ? GROUP BY event_type`
+		cRows, err := r.db.Query(countsQuery, sID)
+		if err == nil {
+			for cRows.Next() {
+				var evType string
+				var count int
+				if err := cRows.Scan(&evType, &count); err == nil {
+					switch evType {
+					case "tab_hidden":
+						summaries[i].TabHiddenCount = count
+					case "window_blur":
+						summaries[i].WindowBlurCount = count
+					case "fullscreen_exit":
+						summaries[i].FullscreenExitCount = count
+					case "paste_attempt":
+						summaries[i].PasteAttemptCount = count
+					case "copy_attempt":
+						summaries[i].CopyAttemptCount = count
+					}
+					summaries[i].TotalWarnings += count
+				}
+			}
+			cRows.Close()
+		}
+
+		// Lấy tối đa 15 sự kiện gần nhất
+		eventsQuery := `SELECT id, session_id, event_type, COALESCE(event_data, ''), created_at 
+			FROM exam_events WHERE session_id = ? ORDER BY created_at DESC LIMIT 15`
+		eRows, err := r.db.Query(eventsQuery, sID)
+		if err == nil {
+			var events []ExamEvent
+			for eRows.Next() {
+				var ev ExamEvent
+				if err := eRows.Scan(&ev.ID, &ev.SessionID, &ev.EventType, &ev.EventData, &ev.CreatedAt); err == nil {
+					events = append(events, ev)
+				}
+			}
+			eRows.Close()
+			summaries[i].Events = events
+		}
+	}
+
+	return summaries, nil
+}
+

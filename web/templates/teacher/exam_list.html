@@ -82,14 +82,15 @@
                             {{ end }}
                         </td>
                         <td style="text-align: center;">
-                            {{ if eq .Status "draft" }}
-                            <form action="/teacher/exam/publish" method="POST" style="display:inline;">
-                                <input type="hidden" name="id" value="{{ .ID }}">
-                                <button type="submit" class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;">Phát hành</button>
-                            </form>
-                            {{ else }}
-                            <span style="font-size: 12px; color: var(--text-muted);">Đang mở thi</span>
-                            {{ end }}
+                            <div style="display: flex; gap: 6px; justify-content: center;">
+                                {{ if eq .Status "draft" }}
+                                <form action="/teacher/exam/publish" method="POST" style="display:inline;">
+                                    <input type="hidden" name="id" value="{{ .ID }}">
+                                    <button type="submit" class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;">Phát hành</button>
+                                </form>
+                                {{ end }}
+                                <a href="/teacher/exam/monitoring?id={{ .ID }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">&#128065; Giám sát</a>
+                            </div>
                         </td>
                     </tr>
                     {{ else }}

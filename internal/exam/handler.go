@@ -272,6 +272,68 @@ func (h *Handler) HandleAPISubmitExam(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleAPIRecordExamEvent ghi nhận sự kiện từ phòng thi (tab_hidden, window_blur, fullscreen_exit, paste_attempt, ...)
+func (h *Handler) HandleAPIRecordExamEvent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Phương thức không được hỗ trợ", http.StatusMethodNotAllowed)
+		return
+	}
+
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Error(w, "Chưa đăng nhập", http.StatusUnauthorized)
+		return
+	}
+
+	type reqBody struct {
+		SessionID int    `json:"session_id"`
+		EventType string `json:"event_type"`
+		EventData string `json:"event_data"`
+	}
+
+	var req reqBody
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "JSON không hợp lệ", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.examService.RecordSessionEvent(req.SessionID, req.EventType, req.EventData); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+// HandleTeacherExamMonitoring trang dashboard giám sát ca thi cho giảng viên
+func (h *Handler) HandleTeacherExamMonitoring(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	examID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || examID <= 0 {
+		http.Error(w, "ID bài thi không hợp lệ", http.StatusBadRequest)
+		return
+	}
+
+	exam, summaries, err := h.examService.GetMonitoringReport(examID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "exam_monitoring.html"), map[string]any{
+		"Title":     "Giám sát phòng thi: " + exam.Title,
+		"Exam":      exam,
+		"Summaries": summaries,
+		"User":      user,
+	})
+}
+
 func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
 	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {

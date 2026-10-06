@@ -85,3 +85,29 @@ type StudentExamSummary struct {
 	FinalScore      *float64   `json:"final_score,omitempty"`
 	IsOpen          bool       `json:"is_open"`
 }
+
+// ExamEvent lưu một sự kiện giám sát phòng thi
+type ExamEvent struct {
+	ID        int       `json:"id"`
+	SessionID int       `json:"session_id"`
+	EventType string    `json:"event_type"` // tab_hidden, window_blur, fullscreen_exit, copy_attempt, paste_attempt, devtool_shortcut
+	EventData string    `json:"event_data,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// StudentMonitoringSummary tổng kết các chỉ số vi phạm giám sát của thí sinh
+type StudentMonitoringSummary struct {
+	SessionID           int         `json:"session_id"`
+	StudentID           int         `json:"student_id"`
+	StudentName         string      `json:"student_name"`
+	SessionStatus       string      `json:"session_status"`
+	FinalScore          float64     `json:"final_score"`
+	TabHiddenCount      int         `json:"tab_hidden_count"`
+	WindowBlurCount     int         `json:"window_blur_count"`
+	FullscreenExitCount int         `json:"fullscreen_exit_count"`
+	PasteAttemptCount   int         `json:"paste_attempt_count"`
+	CopyAttemptCount    int         `json:"copy_attempt_count"`
+	TotalWarnings       int         `json:"total_warnings"`
+	Events              []ExamEvent `json:"events,omitempty"`
+}
+

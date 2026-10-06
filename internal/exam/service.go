@@ -219,3 +219,39 @@ func (s *Service) SubmitExam(sessionID int) (float64, error) {
 
 	return finalScore, nil
 }
+
+// RecordSessionEvent ghi nhận một sự kiện bất thường từ phòng thi của thí sinh
+func (s *Service) RecordSessionEvent(sessionID int, eventType, eventData string) error {
+	if sessionID <= 0 {
+		return errors.New("phiên thi không hợp lệ")
+	}
+
+	validEvents := map[string]bool{
+		"tab_hidden":       true,
+		"window_blur":      true,
+		"fullscreen_exit":  true,
+		"copy_attempt":     true,
+		"paste_attempt":    true,
+		"devtool_shortcut": true,
+		"context_menu":     true,
+	}
+	if !validEvents[eventType] {
+		return errors.New("loại sự kiện giám sát không hợp lệ")
+	}
+
+	return s.repo.RecordEvent(sessionID, eventType, eventData)
+}
+
+// GetMonitoringReport lấy báo cáo giám sát tổng hợp của kỳ thi
+func (s *Service) GetMonitoringReport(examID int) (*Exam, []StudentMonitoringSummary, error) {
+	exam, err := s.GetExam(examID)
+	if err != nil {
+		return nil, nil, err
+	}
+	summaries, err := s.repo.GetExamMonitoringReport(examID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return exam, summaries, nil
+}
+

@@ -327,6 +327,50 @@
 
         document.getElementById('btnSubmitExam').addEventListener('click', () => submitExam(false));
 
+        // Hệ thống ghi nhận hành vi phòng thi (Phase 12: Exam Monitoring)
+        function reportExamEvent(eventType, eventData) {
+            fetch('/api/exam/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionID,
+                    event_type: eventType,
+                    event_data: eventData
+                })
+            }).catch(() => {});
+        }
+
+        // 1. Phát hiện chuyển tab hoặc thu nhỏ trình duyệt
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                reportExamEvent('tab_hidden', 'Rời khỏi tab bài thi lúc ' + new Date().toLocaleTimeString());
+            }
+        });
+
+        // 2. Phát hiện mất tiêu điểm cửa sổ
+        window.addEventListener('blur', function() {
+            reportExamEvent('window_blur', 'Cửa sổ mất tiêu điểm lúc ' + new Date().toLocaleTimeString());
+        });
+
+        // 3. Phát hiện dán mã nguồn ngoài
+        codeEditor.addEventListener('paste', function(e) {
+            const pasteData = (e.clipboardData || window.clipboardData).getData('text') || '';
+            const preview = pasteData.length > 50 ? pasteData.substring(0, 50) + '...' : pasteData;
+            reportExamEvent('paste_attempt', 'Dán mã: ' + preview);
+        });
+
+        // 4. Phát hiện sao chép đề bài
+        document.addEventListener('copy', function() {
+            reportExamEvent('copy_attempt', 'Sao chép văn bản trong phòng thi');
+        });
+
+        // 5. Phát hiện phím tắt DevTools (F12, Ctrl+Shift+I)
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j'))) {
+                reportExamEvent('devtool_shortcut', 'Phím tắt DevTools: ' + e.key);
+            }
+        });
+
         // Khởi động
         loadQuestion(0);
         updateTimer();
