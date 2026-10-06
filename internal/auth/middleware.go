@@ -43,6 +43,11 @@ func GetUser(ctx context.Context) *User {
 	return u
 }
 
+// WithUser gán thông tin User vào Context
+func WithUser(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userCtxKey, user)
+}
+
 // RequireLogin chuyển hướng sang /login nếu người dùng chưa đăng nhập
 func RequireLogin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
