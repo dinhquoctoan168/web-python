@@ -248,3 +248,38 @@ func (r *Repository) UpdateScore(id int, newScore float64) error {
 	_, err := r.db.Exec("UPDATE submissions SET score = ? WHERE id = ?", newScore, id)
 	return err
 }
+
+// UpdateExerciseProgress cập nhật tiến độ bài tập dựa trên kết quả nộp bài chính thức
+func (r *Repository) UpdateExerciseProgress(studentID, exerciseID int, code string, score float64, isOfficialPass bool) error {
+	now := time.Now()
+	if isOfficialPass {
+		query := `INSERT INTO student_exercise_progress 
+			(student_id, exercise_id, status, last_code, best_score, attempts, first_started_at, completed_at, updated_at) 
+			VALUES (?, ?, 'completed', ?, ?, 1, ?, ?, ?)
+			ON CONFLICT(student_id, exercise_id) DO UPDATE SET 
+				status = 'completed',
+				last_code = excluded.last_code,
+				best_score = MAX(student_exercise_progress.best_score, excluded.best_score),
+				attempts = student_exercise_progress.attempts + 1,
+				completed_at = COALESCE(student_exercise_progress.completed_at, excluded.completed_at),
+				updated_at = excluded.updated_at`
+		_, err := r.db.Exec(query, studentID, exerciseID, code, score, now, now, now)
+		return err
+	}
+
+	query := `INSERT INTO student_exercise_progress 
+		(student_id, exercise_id, status, last_code, best_score, attempts, first_started_at, updated_at) 
+		VALUES (?, ?, 'in_progress', ?, ?, 1, ?, ?)
+		ON CONFLICT(student_id, exercise_id) DO UPDATE SET 
+			status = CASE 
+				WHEN student_exercise_progress.status IN ('passed_public', 'completed') THEN student_exercise_progress.status 
+				ELSE 'in_progress' 
+			END,
+			last_code = excluded.last_code,
+			best_score = MAX(student_exercise_progress.best_score, excluded.best_score),
+			attempts = student_exercise_progress.attempts + 1,
+			updated_at = excluded.updated_at`
+	_, err := r.db.Exec(query, studentID, exerciseID, code, score, now, now)
+	return err
+}
+

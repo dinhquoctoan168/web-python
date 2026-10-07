@@ -474,6 +474,11 @@ body.is-resizing * {
     font-weight: bold;
 }
 
+.ex-bullet.status-passedpublic {
+    color: #61afef;
+    font-weight: bold;
+}
+
 .ex-bullet.status-inprogress {
     color: #e5c07b;
 }

@@ -109,15 +109,13 @@ func (r *Repository) RecordSubmission(studentID, exerciseID int, code string, sc
 	now := time.Now()
 	if existing == nil {
 		status := StatusInProgress
-		var completedAt any = nil
 		if passed {
-			status = StatusCompleted
-			completedAt = now
+			status = StatusPassedPublic
 		}
 		query := `INSERT INTO student_exercise_progress 
 			(student_id, exercise_id, status, last_code, best_score, attempts, first_started_at, completed_at, updated_at) 
-			VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
-		_, err := r.db.Exec(query, studentID, exerciseID, status, code, score, now, completedAt, now)
+			VALUES (?, ?, ?, ?, ?, 1, ?, NULL, ?)`
+		_, err := r.db.Exec(query, studentID, exerciseID, status, code, score, now, now)
 		if err != nil {
 			return nil, err
 		}
@@ -129,26 +127,27 @@ func (r *Repository) RecordSubmission(studentID, exerciseID int, code string, sc
 		}
 
 		status := existing.Status
-		if passed {
-			status = StatusCompleted
+		if status != StatusCompleted {
+			if passed {
+				status = StatusPassedPublic
+			} else if status == StatusNotStarted {
+				status = StatusInProgress
+			}
 		}
 
-		var query string
-		if passed && existing.CompletedAt == nil {
-			query = `UPDATE student_exercise_progress 
-				SET last_code = ?, best_score = ?, attempts = ?, status = ?, completed_at = ?, updated_at = ? 
-				WHERE student_id = ? AND exercise_id = ?`
-			_, err = r.db.Exec(query, code, newBestScore, newAttempts, status, now, now, studentID, exerciseID)
-		} else {
-			query = `UPDATE student_exercise_progress 
-				SET last_code = ?, best_score = ?, attempts = ?, status = ?, updated_at = ? 
-				WHERE student_id = ? AND exercise_id = ?`
-			_, err = r.db.Exec(query, code, newBestScore, newAttempts, status, now, studentID, exerciseID)
-		}
+		query := `UPDATE student_exercise_progress 
+			SET last_code = ?, best_score = ?, attempts = ?, status = ?, updated_at = ? 
+			WHERE student_id = ? AND exercise_id = ?`
+		_, err = r.db.Exec(query, code, newBestScore, newAttempts, status, now, studentID, exerciseID)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return r.GetProgress(studentID, exerciseID)
+}
+
+// RecordPublicTestResult là bí danh chuẩn hóa của RecordSubmission cho public test results
+func (r *Repository) RecordPublicTestResult(studentID, exerciseID int, code string, score float64, passed bool) (*StudentExerciseProgress, error) {
+	return r.RecordSubmission(studentID, exerciseID, code, score, passed)
 }

@@ -4,9 +4,10 @@ import "time"
 
 // Các trạng thái bài tập của học viên
 const (
-	StatusNotStarted = "not_started"
-	StatusInProgress = "in_progress"
-	StatusCompleted  = "completed"
+	StatusNotStarted   = "not_started"
+	StatusInProgress   = "in_progress"
+	StatusPassedPublic = "passed_public"
+	StatusCompleted    = "completed"
 )
 
 // StudentExerciseProgress đại diện cho tiến độ luyện tập của học viên với một bài tập

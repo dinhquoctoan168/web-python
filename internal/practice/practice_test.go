@@ -84,7 +84,7 @@ func TestPracticeDraftAndSubmission(t *testing.T) {
 		t.Errorf("Kỳ vọng status vẫn là in_progress khi chưa pass, nhận %s", p3.Status)
 	}
 
-	// 5. Kiểm tra SubmitPractice thành công (passed = true)
+	// 5. Kiểm tra SubmitPractice thành công public tests (passed = true)
 	finalCode := "def test():\n    return 42 # solved"
 	p4, err := svc.SubmitPractice(1, 1, finalCode, 100.0, true)
 	if err != nil {
@@ -96,11 +96,8 @@ func TestPracticeDraftAndSubmission(t *testing.T) {
 	if p4.BestScore != 100.0 {
 		t.Errorf("Kỳ vọng best_score = 100.0, nhận %f", p4.BestScore)
 	}
-	if p4.Status != StatusCompleted {
-		t.Errorf("Kỳ vọng status = completed sau khi pass, nhận %s", p4.Status)
-	}
-	if p4.CompletedAt == nil {
-		t.Errorf("Kỳ vọng completed_at được ghi nhận")
+	if p4.Status != StatusPassedPublic {
+		t.Errorf("Kỳ vọng status = passed_public sau khi pass public tests, nhận %s", p4.Status)
 	}
 
 	// 6. Kiểm tra GetAllStates
@@ -111,7 +108,7 @@ func TestPracticeDraftAndSubmission(t *testing.T) {
 	if len(states) != 1 {
 		t.Fatalf("Kỳ vọng 1 bài tập có trạng thái, nhận %d", len(states))
 	}
-	if states[0].ExerciseID != 1 || states[0].Status != StatusCompleted {
+	if states[0].ExerciseID != 1 || states[0].Status != StatusPassedPublic {
 		t.Errorf("Dữ liệu states không khớp: %+v", states[0])
 	}
 }

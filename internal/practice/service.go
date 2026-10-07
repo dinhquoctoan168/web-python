@@ -39,6 +39,11 @@ func (s *Service) SubmitPractice(studentID, exerciseID int, code string, score f
 	return progress, nil
 }
 
+// RecordPublicTestResult ghi nhận kết quả chạy thử các test case công khai
+func (s *Service) RecordPublicTestResult(studentID, exerciseID int, code string, score float64, passed bool) (*StudentExerciseProgress, error) {
+	return s.SubmitPractice(studentID, exerciseID, code, score, passed)
+}
+
 // GetState lấy trạng thái luyện tập của học viên đối với bài tập
 func (s *Service) GetState(studentID, exerciseID int) (*StudentExerciseProgress, error) {
 	if studentID <= 0 || exerciseID <= 0 {

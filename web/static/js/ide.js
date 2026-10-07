@@ -165,11 +165,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const bullet = document.getElementById(`exBullet-${exerciseId}`);
         if (!bullet) return;
 
-        bullet.classList.remove('status-completed', 'status-inprogress', 'status-notstarted');
+        bullet.classList.remove('status-completed', 'status-passedpublic', 'status-inprogress', 'status-notstarted');
         if (status === 'completed') {
             bullet.classList.add('status-completed');
             bullet.innerHTML = '&#10003;'; // ✓
             bullet.title = 'Đã hoàn thành';
+        } else if (status === 'passed_public') {
+            bullet.classList.add('status-passedpublic');
+            bullet.innerHTML = '&#9733;'; // ★
+            bullet.title = 'Đạt test công khai';
         } else if (status === 'in_progress') {
             bullet.classList.add('status-inprogress');
             bullet.innerHTML = '&#9679;'; // ●
@@ -812,7 +816,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 8. Chấm thử (Test Cases)
     function runTests() {
-        if (currentExercise && (currentExercise.exercise_type === 'multiple_choice' || currentExercise.exercise_type === 'quiz')) {
+        if (currentExercise && (currentExercise.exerciseType === 'multiple_choice' || currentExercise.exerciseType === 'quiz')) {
             submitQuizChoice();
             return;
         }
@@ -930,13 +934,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (data && data.judge) {
                 const j = data.judge;
-                const passed = (j.status === 'passed' || (j.passed_tests === j.total_tests && j.total_tests > 0));
+                const passed = j.status === 'pass';
                 if (execStatus) {
                     execStatus.textContent = passed ? `Đạt ${j.passed_tests}/${j.total_tests} test` : `Không đạt (${j.passed_tests}/${j.total_tests})`;
                     execStatus.style.color = passed ? "var(--accent-emerald)" : "var(--accent-red)";
                 }
                 updateExerciseBullet(currentExercise.id, passed ? 'completed' : 'in_progress');
-                alert(`Kết quả chấm bài chính thức (Server Judge):\n- Trạng thái: ${j.status === 'passed' ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (FAIL)'}\n- Điểm số: ${j.score}\n- Test cases: ${j.passed_tests}/${j.total_tests}`);
+                alert(`Kết quả chấm bài chính thức (Server Judge):\n- Trạng thái: ${j.status === 'pass' ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (FAIL)'}\n- Điểm số: ${j.score}\n- Test cases: ${j.passed_tests}/${j.total_tests}`);
             } else {
                 alert('Đã gửi bài nộp thành công!');
             }

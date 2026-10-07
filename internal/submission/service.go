@@ -70,6 +70,8 @@ func (s *Service) JudgeAndSubmit(studentID, exerciseID int, sourceCode string) (
 		return nil, nil, err
 	}
 
+	_ = s.repo.UpdateExerciseProgress(studentID, exerciseID, sourceCode, sub.Score, sub.Status == "pass")
+
 	return createdSub, judgeRes, nil
 }
 
@@ -113,6 +115,9 @@ func (s *Service) SubmitCode(studentID, exerciseID int, code string, score float
 		audit.LogSubmissionFailure(studentID, exerciseID, err.Error())
 		return nil, err
 	}
+
+	_ = s.repo.UpdateExerciseProgress(studentID, exerciseID, code, sub.Score, sub.Status == "pass")
+
 	return created, nil
 }
 
