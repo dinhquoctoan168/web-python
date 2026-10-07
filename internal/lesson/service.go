@@ -59,7 +59,7 @@ func (s *Service) GetLessonDetail(lessonID int, isTeacher bool) (*Lesson, *Cours
 		return nil, nil, ErrLessonNotFound
 	}
 
-	lesson.SafeHTML = template.HTML(lesson.ContentHTML)
+	lesson.SafeHTML = template.HTML(SanitizeHTML(lesson.ContentHTML))
 
 	curriculum, err := s.repo.GetCurriculum(lesson.CourseID, !isTeacher)
 	if err != nil {
@@ -74,7 +74,12 @@ func (s *Service) GetLessonByID(lessonID int) (*Lesson, error) {
 	if lessonID <= 0 {
 		return nil, ErrLessonNotFound
 	}
-	return s.repo.FindLessonByID(lessonID)
+	lesson, err := s.repo.FindLessonByID(lessonID)
+	if err != nil || lesson == nil {
+		return nil, err
+	}
+	lesson.SafeHTML = template.HTML(SanitizeHTML(lesson.ContentHTML))
+	return lesson, nil
 }
 
 // GetChapterByID lấy thông tin chương đơn lẻ
