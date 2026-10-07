@@ -37,11 +37,12 @@ type ActionMetricRequest struct {
 
 // CreateSubmissionRequest DTO gửi từ client khi lưu lượt nộp bài
 type CreateSubmissionRequest struct {
-	ExerciseID  int     `json:"exercise_id"`
-	SourceCode  string  `json:"source_code"`
-	Score       float64 `json:"score"`
-	PassedTests int     `json:"passed_tests"`
-	TotalTests  int     `json:"total_tests"`
+	ExerciseID   int     `json:"exercise_id"`
+	AssignmentID int     `json:"assignment_id,omitempty"`
+	SourceCode   string  `json:"source_code"`
+	Score        float64 `json:"score"`
+	PassedTests  int     `json:"passed_tests"`
+	TotalTests   int     `json:"total_tests"`
 }
 
 // StudentHistoryView DTO tổng hợp lịch sử bài nộp và thống kê nỗ lực cho giảng viên

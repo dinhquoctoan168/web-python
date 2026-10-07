@@ -65,6 +65,15 @@ func (s *Service) AssignmentContainsExercise(assignmentID, exerciseID int) (bool
 	return false, nil
 }
 
+// CanAccessAssignmentExercise kiểm tra học viên có quyền truy cập bài tập trong assignment hay không
+func (s *Service) CanAccessAssignmentExercise(assignmentID, studentID, exerciseID int) (bool, error) {
+	asgn, err := s.GetAssignmentForStudent(assignmentID, studentID)
+	if err != nil || asgn == nil {
+		return false, err
+	}
+	return s.AssignmentContainsExercise(assignmentID, exerciseID)
+}
+
 // CreateAssignment xử lý tạo mới bài tập cho lớp
 func (s *Service) CreateAssignment(teacherID, classID int, title, description, startAtStr, dueAtStr string, exerciseIDs []int, points []float64) (*Assignment, error) {
 	if teacherID <= 0 || classID <= 0 {

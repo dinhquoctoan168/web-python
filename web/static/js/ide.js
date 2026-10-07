@@ -723,7 +723,12 @@ document.addEventListener('DOMContentLoaded', function() {
         showExerciseLoading(id);
 
         try {
-            const res = await fetch(`/api/exercise?id=${id}`, {
+            let fetchUrl = `/api/exercise?id=${id}`;
+            if (window.IDE_CONTEXT && window.IDE_CONTEXT.mode === 'assignment' && window.IDE_CONTEXT.assignmentId) {
+                fetchUrl += `&assignment_id=${window.IDE_CONTEXT.assignmentId}`;
+            }
+
+            const res = await fetch(fetchUrl, {
                 signal: exerciseLoadController.signal
             });
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -906,16 +911,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         await flushCurrentDraft();
 
+        const submissionPayload = {
+            exercise_id: currentExercise.id,
+            source_code: code
+        };
+        if (window.IDE_CONTEXT && window.IDE_CONTEXT.mode === 'assignment' && window.IDE_CONTEXT.assignmentId) {
+            submissionPayload.assignment_id = window.IDE_CONTEXT.assignmentId;
+        }
+
         fetch('/api/submissions', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'X-CSRF-Token': getCsrfToken()
             },
-            body: JSON.stringify({
-                exercise_id: currentExercise.id,
-                source_code: code
-            })
+            body: JSON.stringify(submissionPayload)
         })
         .then(res => {
             if (!res.ok) throw new Error('HTTP ' + res.status);

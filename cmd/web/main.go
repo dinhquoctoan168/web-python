@@ -153,6 +153,8 @@ func main() {
 	assignmentService.SetClassService(classService)
 	examService.SetAuditService(auditService)
 	submissionService.SetAuditService(auditService)
+	exerciseHandler.SetAssignmentService(assignmentService)
+	submissionHandler.SetAssignmentService(assignmentService)
 
 	// Liên kết lấy chương trình học vào trang chi tiết môn học
 	courseHandler.SetCurriculumFetcher(func(courseID int, isTeacher bool) (any, error) {

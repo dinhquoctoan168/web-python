@@ -10,12 +10,22 @@ import (
 	"web_python/internal/security"
 )
 
+// AssignmentAuthorizer xác thực quyền truy cập và nộp bài cho assignment
+type AssignmentAuthorizer interface {
+	CanAccessAssignmentExercise(assignmentID, studentID, exerciseID int) (bool, error)
+}
+
 type Handler struct {
-	service *Service
+	service              *Service
+	assignmentAuthorizer AssignmentAuthorizer
 }
 
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
+}
+
+func (h *Handler) SetAssignmentService(authorizer AssignmentAuthorizer) {
+	h.assignmentAuthorizer = authorizer
 }
 
 // HandleRecordAction xử lý POST /api/attempt/action (run, test, hint)
@@ -64,6 +74,15 @@ func (h *Handler) HandleCreateSubmission(w http.ResponseWriter, r *http.Request)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Dữ liệu JSON không hợp lệ", http.StatusBadRequest)
 		return
+	}
+
+	// Nếu gửi kèm assignment_id, xác thực quyền nộp bài cho assignment
+	if req.AssignmentID > 0 && h.assignmentAuthorizer != nil {
+		ok, err := h.assignmentAuthorizer.CanAccessAssignmentExercise(req.AssignmentID, user.ID, req.ExerciseID)
+		if err != nil || !ok {
+			http.Error(w, "Không có quyền nộp bài cho bài tập lớn này", http.StatusForbidden)
+			return
+		}
 	}
 
 	// Nếu backend có Judge Service: chấm bằng Server-Side Judge chính thức (Phase 10)
