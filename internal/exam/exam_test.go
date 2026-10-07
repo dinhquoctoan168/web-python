@@ -2,6 +2,8 @@ package exam
 
 import (
 	"database/sql"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,5 +137,111 @@ func TestExamFullLifecycle(t *testing.T) {
 	}
 	if studentExamsAfter[0].FinalScore == nil || *studentExamsAfter[0].FinalScore != 4.0 {
 		t.Errorf("Kỳ vọng FinalScore là 4.0")
+	}
+}
+
+func TestExam_StudentCannotStartEarly(t *testing.T) {
+	db, svc := setupTestDB(t)
+	defer db.Close()
+
+	// Tạo ca thi có StartAt cách thời điểm hiện tại 2 giờ trong tương lai
+	startStr := time.Now().Add(2 * time.Hour).Format("2006-01-02T15:04")
+	endStr := time.Now().Add(4 * time.Hour).Format("2006-01-02T15:04")
+
+	exam, err := svc.CreateExam(2, 1, "Thi cuối kỳ (chưa mở)", "Mô tả", 60, startStr, endStr, []int{101}, []float64{10.0})
+	if err != nil {
+		t.Fatalf("CreateExam thất bại: %v", err)
+	}
+	if err := svc.PublishExam(exam.ID); err != nil {
+		t.Fatalf("PublishExam thất bại: %v", err)
+	}
+
+	// Sinh viên 3 cố gắng vào thi sớm -> Hệ thống từ chối
+	_, _, _, err = svc.StartOrResumeSession(exam.ID, 3)
+	if err == nil {
+		t.Fatalf("Kỳ vọng lỗi khi sinh viên vào thi sớm, nhưng hàm trả về thành công")
+	}
+	if !strings.Contains(err.Error(), "chưa đến giờ mở ca thi") {
+		t.Errorf("Kỳ vọng thông báo 'chưa đến giờ mở ca thi', nhận được: %v", err)
+	}
+}
+
+func TestExam_StudentCannotSubmitAfterDeadline(t *testing.T) {
+	db, svc := setupTestDB(t)
+	defer db.Close()
+
+	startStr := time.Now().Add(-3 * time.Hour).Format("2006-01-02T15:04")
+	endStr := time.Now().Add(1 * time.Hour).Format("2006-01-02T15:04")
+
+	// Đề thi 30 phút, nhưng đã bắt đầu cách đây 2 giờ
+	exam, err := svc.CreateExam(2, 1, "Kiểm tra 30 phút", "Mô tả", 30, startStr, endStr, []int{101}, []float64{10.0})
+	if err != nil {
+		t.Fatalf("CreateExam thất bại: %v", err)
+	}
+	if err := svc.PublishExam(exam.ID); err != nil {
+		t.Fatalf("PublishExam thất bại: %v", err)
+	}
+
+	// Sinh viên bắt đầu làm bài
+	session, _, _, err := svc.StartOrResumeSession(exam.ID, 3)
+	if err != nil {
+		t.Fatalf("StartOrResumeSession thất bại: %v", err)
+	}
+
+	// Giả lập thời gian phiên thi đã bắt đầu từ 2 tiếng trước (quá thời lượng 30 phút)
+	twoHoursAgo := time.Now().Add(-2 * time.Hour)
+	_, err = db.Exec("UPDATE exam_sessions SET started_at = ? WHERE id = ?", twoHoursAgo, session.ID)
+	if err != nil {
+		t.Fatalf("Lỗi update started_at: %v", err)
+	}
+
+	// 1. Lưu nháp code sau hạn chót -> Bị từ chối ErrSessionClosed
+	err = svc.SaveAnswerDraft(session.ID, 101, "def double_val(n): return n * 2")
+	if !errors.Is(err, ErrSessionClosed) {
+		t.Errorf("Lưu nháp sau deadline kỳ vọng ErrSessionClosed, nhận: %v", err)
+	}
+
+	// 2. Nộp bài sau hạn chót -> Bị từ chối ErrSessionClosed
+	_, err = svc.SubmitExam(session.ID)
+	if !errors.Is(err, ErrSessionClosed) {
+		t.Errorf("Nộp bài sau deadline kỳ vọng ErrSessionClosed, nhận: %v", err)
+	}
+}
+
+func TestExam_TimerCalculatedByServer(t *testing.T) {
+	db, svc := setupTestDB(t)
+	defer db.Close()
+
+	startStr := time.Now().Add(-1 * time.Hour).Format("2006-01-02T15:04")
+	endStr := time.Now().Add(2 * time.Hour).Format("2006-01-02T15:04")
+
+	// Đề thi 60 phút
+	exam, err := svc.CreateExam(2, 1, "Thi tính giờ Server", "Mô tả", 60, startStr, endStr, []int{101}, []float64{10.0})
+	if err != nil {
+		t.Fatalf("CreateExam thất bại: %v", err)
+	}
+	if err := svc.PublishExam(exam.ID); err != nil {
+		t.Fatalf("PublishExam thất bại: %v", err)
+	}
+
+	session, _, _, err := svc.StartOrResumeSession(exam.ID, 3)
+	if err != nil {
+		t.Fatalf("StartOrResumeSession thất bại: %v", err)
+	}
+
+	// Giả lập phiên thi đã bắt đầu từ 20 phút trước
+	twentyMinAgo := time.Now().Add(-20 * time.Minute)
+	_, _ = db.Exec("UPDATE exam_sessions SET started_at = ? WHERE id = ?", twentyMinAgo, session.ID)
+
+	// Sinh viên resume phiên thi -> Server phải tự tính remaining_seconds dựa trên đồng hồ server
+	resumedSession, _, _, err := svc.StartOrResumeSession(exam.ID, 3)
+	if err != nil {
+		t.Fatalf("Resume session thất bại: %v", err)
+	}
+
+	// Thời lượng 60 phút - 20 phút đã trôi qua = 40 phút = 2400 giây
+	// Kỳ vọng remaining trong khoảng 2380 - 2420 giây
+	if resumedSession.RemainingSeconds < 2380 || resumedSession.RemainingSeconds > 2420 {
+		t.Errorf("Thời gian RemainingSeconds tính toán sai: %d (kỳ vọng xấp xỉ 2400 giây)", resumedSession.RemainingSeconds)
 	}
 }

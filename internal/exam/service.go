@@ -198,6 +198,17 @@ func (s *Service) SaveAnswerDraft(sessionID, exerciseID int, sourceCode string) 
 		return ErrSessionClosed
 	}
 
+	exam, err := s.GetExam(session.ExamID)
+	if err == nil && exam != nil {
+		deadline := session.StartedAt.Add(time.Duration(exam.DurationMinutes) * time.Minute)
+		if exam.EndAt != nil && exam.EndAt.Before(deadline) {
+			deadline = *exam.EndAt
+		}
+		if time.Now().After(deadline) {
+			return ErrSessionClosed
+		}
+	}
+
 	return s.repo.SaveSessionAnswer(sessionID, exerciseID, sourceCode, 0)
 }
 
@@ -210,10 +221,22 @@ func (s *Service) SubmitExam(sessionID int) (float64, error) {
 	if session.Status == SessionSubmitted {
 		return session.FinalScore, nil
 	}
+	if session.Status != SessionInProgress {
+		return 0, ErrSessionClosed
+	}
 
 	exam, err := s.GetExam(session.ExamID)
 	if err != nil {
 		return 0, err
+	}
+
+	deadline := session.StartedAt.Add(time.Duration(exam.DurationMinutes) * time.Minute)
+	if exam.EndAt != nil && exam.EndAt.Before(deadline) {
+		deadline = *exam.EndAt
+	}
+	// Khóa nộp bài nếu vượt quá hạn chót thời gian làm bài (+15s bù trễ mạng)
+	if time.Now().After(deadline.Add(15 * time.Second)) {
+		return 0, ErrSessionClosed
 	}
 
 	answers, err := s.repo.GetSessionAnswers(sessionID)

@@ -39,6 +39,15 @@ func (s *Service) GetCourseByID(id int) (*Course, error) {
 	return s.repo.FindCourseByID(id)
 }
 
+// GetCourseByCode lấy thông tin môn học theo mã code
+func (s *Service) GetCourseByCode(code string) (*Course, error) {
+	code = strings.TrimSpace(strings.ToUpper(code))
+	if code == "" {
+		return nil, ErrInvalidCourseData
+	}
+	return s.repo.FindCourseByCode(code)
+}
+
 // CreateCourse tạo mới một môn học
 func (s *Service) CreateCourse(code, name, desc string, createdBy int) (*Course, error) {
 	code = strings.TrimSpace(strings.ToUpper(code))

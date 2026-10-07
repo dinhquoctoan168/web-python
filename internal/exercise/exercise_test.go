@@ -2,6 +2,9 @@ package exercise
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -139,5 +142,40 @@ func TestVisualizationTypeField(t *testing.T) {
 	}
 	if clientEx == nil || clientEx.VisualizationType != "binary_search" {
 		t.Fatalf("Kỳ vọng VisualizationType = 'binary_search', nhận được: %v", clientEx.VisualizationType)
+	}
+}
+
+func TestHandleAPIExercise_HiddenTestsNeverReturned(t *testing.T) {
+	db, exID := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	handler := NewHandler(svc)
+
+	req := httptest.NewRequest("GET", "/api/exercise?id="+strconv.Itoa(exID), nil)
+	rec := httptest.NewRecorder()
+
+	handler.HandleAPIExercise(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HandleAPIExercise thất bại, code: %d", rec.Code)
+	}
+
+	body := rec.Body.String()
+
+	// 1. Kiểm tra không chứa input hay output của hidden test case
+	if strings.Contains(body, "100, 200, 50") || strings.Contains(body, "(50, 200)") {
+		t.Fatalf("BẢO MẬT: Phát hiện hidden test case bị lộ trong API response: %s", body)
+	}
+
+	// 2. Kiểm tra không chứa solution_code
+	if strings.Contains(body, "min(arr), max(arr)") {
+		t.Fatalf("BẢO MẬT: Phát hiện solution_code bị lộ trong API response: %s", body)
+	}
+
+	// 3. Phải chứa public test case
+	if !strings.Contains(body, "[1, 2, 3]") {
+		t.Errorf("API response thiếu public test case")
 	}
 }

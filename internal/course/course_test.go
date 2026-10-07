@@ -2,7 +2,13 @@ package course
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
+
+	"web_python/internal/auth"
 
 	_ "modernc.org/sqlite"
 )
@@ -107,5 +113,76 @@ func TestCourseCRUD(t *testing.T) {
 	}
 	if len(teacherCourses) != 1 {
 		t.Errorf("Kỳ vọng giảng viên thấy 1 môn, nhận %d", len(teacherCourses))
+	}
+}
+
+func TestTeacherCreateCourse_And_StudentCannotCreate(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	service := NewService(repo)
+	handler := NewHandler(service)
+
+	protectedCreate := auth.RequireTeacher(handler.HandleTeacherCreateCourse)
+
+	teacherUser := &auth.User{
+		ID:       10,
+		Username: "teacher10",
+		Role:     auth.RoleTeacher,
+		IsActive: true,
+	}
+	studentUser := &auth.User{
+		ID:       20,
+		Username: "student20",
+		Role:     auth.RoleStudent,
+		IsActive: true,
+	}
+
+	form := url.Values{}
+	form.Set("code", "DSA301")
+	form.Set("name", "Cấu trúc dữ liệu & Giải thuật")
+	form.Set("description", "Học phần CTDL & GT")
+
+	// 1. Sinh viên cố gắng tạo môn học -> Bị từ chối HTTP 403 Forbidden
+	reqStudent := httptest.NewRequest("POST", "/teacher/course/create", strings.NewReader(form.Encode()))
+	reqStudent.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqStudent = reqStudent.WithContext(auth.WithUser(reqStudent.Context(), studentUser))
+	recStudent := httptest.NewRecorder()
+
+	protectedCreate(recStudent, reqStudent)
+
+	if recStudent.Code != http.StatusForbidden {
+		t.Errorf("Sinh viên gọi tạo môn học kỳ vọng 403 Forbidden, nhận %d", recStudent.Code)
+	}
+
+	// Xác nhận trong DB môn DSA301 chưa được tạo
+	cNotCreated, _ := service.GetCourseByCode("DSA301")
+	if cNotCreated != nil {
+		t.Fatalf("LỖI: Môn học đã bị tạo trái phép bởi sinh viên")
+	}
+
+	// 2. Giảng viên tạo môn học -> Thành công HTTP 303 Redirect sang /teacher/courses
+	reqTeacher := httptest.NewRequest("POST", "/teacher/course/create", strings.NewReader(form.Encode()))
+	reqTeacher.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqTeacher = reqTeacher.WithContext(auth.WithUser(reqTeacher.Context(), teacherUser))
+	recTeacher := httptest.NewRecorder()
+
+	protectedCreate(recTeacher, reqTeacher)
+
+	if recTeacher.Code != http.StatusSeeOther {
+		t.Errorf("Giảng viên tạo môn học kỳ vọng 303 Redirect, nhận %d", recTeacher.Code)
+	}
+	if loc := recTeacher.Header().Get("Location"); loc != "/teacher/courses" {
+		t.Errorf("Kỳ vọng chuyển hướng đến /teacher/courses, nhận %s", loc)
+	}
+
+	// Xác nhận môn học đã được tạo trong DB với creator = 10
+	cCreated, err := service.GetCourseByCode("DSA301")
+	if err != nil || cCreated == nil {
+		t.Fatalf("Không tìm thấy môn học vừa được giảng viên tạo: %v", err)
+	}
+	if cCreated.CreatedBy != 10 {
+		t.Errorf("Kỳ vọng CreatedBy = 10, nhận %d", cCreated.CreatedBy)
 	}
 }
