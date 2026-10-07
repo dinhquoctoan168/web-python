@@ -8,6 +8,8 @@ import (
 	"strconv"
 
 	"web_python/internal/auth"
+	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 type Handler struct {
@@ -38,7 +40,7 @@ func (h *Handler) HandleTeacherDashboard(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "dashboard.html"), data)
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "dashboard.html"), data)
 }
 
 // HandleClassAnalytics xử lý GET /teacher/class/analytics?class_id=
@@ -68,7 +70,7 @@ func (h *Handler) HandleClassAnalytics(w http.ResponseWriter, r *http.Request) {
 		"Analytics": data,
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "class_analytics.html"), pageData)
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "class_analytics.html"), pageData)
 }
 
 // HandleStudentDetail xử lý GET /teacher/student/detail?student_id=&class_id=
@@ -93,10 +95,17 @@ func (h *Handler) HandleStudentDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "student_detail.html"), data)
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "student_detail.html"), data)
 }
 
-func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
+func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPath string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		frontend.InjectCSRFToMap(r, m)
+	} else if d, ok := data.(*TeacherDashboardPageData); ok {
+		d.CSRFToken = security.GetTokenFromContext(r.Context())
+	} else if d, ok := data.(*StudentDetailData); ok {
+		d.CSRFToken = security.GetTokenFromContext(r.Context())
+	}
 	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		http.Error(w, "Lỗi tải giao diện: "+err.Error(), http.StatusInternalServerError)

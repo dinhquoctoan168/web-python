@@ -187,3 +187,118 @@ func (r *Repository) ListAll() ([]Exercise, error) {
 	}
 	return list, nil
 }
+
+// GetCourseStructure lấy cấu trúc môn học gồm các chương và bài tập (an toàn cho client)
+func (r *Repository) GetCourseStructure(courseID int) ([]ChapterWithExercises, error) {
+	cRows, err := r.db.Query(`SELECT id, course_id, title, COALESCE(description, ''), order_num 
+		FROM chapters WHERE course_id = ? ORDER BY order_num ASC, id ASC`, courseID)
+	if err != nil {
+		return nil, err
+	}
+	defer cRows.Close()
+
+	var chapters []ChapterWithExercises
+	for cRows.Next() {
+		var c ChapterWithExercises
+		if err := cRows.Scan(&c.ID, &c.CourseID, &c.Title, &c.Description, &c.OrderNum); err == nil {
+			chapters = append(chapters, c)
+		}
+	}
+
+	loadExercisesForQuery := func(query string, args ...any) ([]ClientExerciseDetail, error) {
+		rows, err := r.db.Query(query, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var exList []ClientExerciseDetail
+		for rows.Next() {
+			var ex ClientExerciseDetail
+			var allowedFuncsRaw string
+			var lid, tid sql.NullInt64
+			if err := rows.Scan(
+				&ex.ID, &ex.CourseID, &lid, &tid, &ex.TopicName, &ex.Title,
+				&ex.ExerciseType, &ex.Difficulty, &ex.Description, &ex.InitialCode,
+				&ex.SolutionHint, &allowedFuncsRaw, &ex.TimeLimitMS, &ex.VisualizationType,
+			); err == nil {
+				if lid.Valid {
+					v := int(lid.Int64)
+					ex.LessonID = &v
+				}
+				if tid.Valid {
+					v := int(tid.Int64)
+					ex.TopicID = &v
+				}
+				_ = json.Unmarshal([]byte(allowedFuncsRaw), &ex.AllowedFunctions)
+
+				// Nạp public test cases
+				tcs, tcErr := r.FindTestCasesByExerciseID(ex.ID, false)
+				if tcErr == nil {
+					var publicTCs []PublicTestCase
+					for _, tc := range tcs {
+						publicTCs = append(publicTCs, PublicTestCase{
+							ID:             tc.ID,
+							InputData:      tc.InputData,
+							CallExpression: tc.CallExpression,
+							ExpectedOutput: tc.ExpectedOutput,
+							Weight:         tc.Weight,
+							OrderNum:       tc.OrderNum,
+						})
+					}
+					ex.TestCases = publicTCs
+					if tcsJSON, jErr := json.Marshal(publicTCs); jErr == nil {
+						ex.TestCasesJSON = string(tcsJSON)
+					} else {
+						ex.TestCasesJSON = "[]"
+					}
+				} else {
+					ex.TestCasesJSON = "[]"
+				}
+
+				exList = append(exList, ex)
+			}
+		}
+		return exList, nil
+	}
+
+	exSelectSQL := `SELECT e.id, e.course_id, e.lesson_id, e.topic_id, COALESCE(t.name, ''), e.title, 
+		e.exercise_type, e.difficulty, e.description, COALESCE(e.initial_code, ''), 
+		COALESCE(e.solution_hint, ''), COALESCE(e.allowed_functions, '[]'), e.time_limit_ms, 
+		COALESCE(e.visualization_type, '')
+		FROM exercises e
+		LEFT JOIN lessons l ON e.lesson_id = l.id
+		LEFT JOIN topics t ON e.topic_id = t.id`
+
+	if len(chapters) == 0 {
+		// Trường hợp môn học chưa chia chương, gom toàn bộ bài tập vào 1 nhóm mặc định
+		exercises, err := loadExercisesForQuery(exSelectSQL+` WHERE e.course_id = ? ORDER BY e.id ASC`, courseID)
+		if err != nil {
+			return nil, err
+		}
+		if len(exercises) > 0 {
+			chapters = append(chapters, ChapterWithExercises{
+				ID:          0,
+				CourseID:    courseID,
+				Title:       "Danh sách bài tập",
+				Description: "",
+				Exercises:   exercises,
+			})
+		}
+		return chapters, nil
+	}
+
+	for i := range chapters {
+		chapID := chapters[i].ID
+		var exercises []ClientExerciseDetail
+		if i == 0 {
+			// Nhóm đầu tiên gom thêm các bài tập thuộc course mà lesson_id is null
+			exercises, _ = loadExercisesForQuery(exSelectSQL+` WHERE l.chapter_id = ? OR (e.course_id = ? AND e.lesson_id IS NULL) ORDER BY e.id ASC`, chapID, courseID)
+		} else {
+			exercises, _ = loadExercisesForQuery(exSelectSQL+` WHERE l.chapter_id = ? ORDER BY e.id ASC`, chapID)
+		}
+		chapters[i].Exercises = exercises
+	}
+
+	return chapters, nil
+}

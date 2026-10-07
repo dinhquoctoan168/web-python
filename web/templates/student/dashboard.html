@@ -17,7 +17,7 @@
             <a href="/dashboard" class="active">&#128202; Dashboard</a>
             <a href="/courses">&#128218; Môn học</a>
             <a href="/my-assignments">&#128221; Bài tập</a>
-            <a href="/student/exams">&#9201; Kiểm tra</a>
+            <a href="/my-exams">&#9201; Kiểm tra</a>
             <a href="/dashboard#submissions">&#128203; Kết quả</a>
             <a href="/ide" style="color: var(--nav-accent);">&#9658; Web IDE</a>
         </nav>
@@ -26,6 +26,7 @@
                 <span class="user-name">{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
                 </form>
             {{ end }}

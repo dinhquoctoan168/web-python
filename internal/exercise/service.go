@@ -93,3 +93,13 @@ func (s *Service) GetExerciseForJudge(id int) (*Exercise, error) {
 func (s *Service) ListAll() ([]Exercise, error) {
 	return s.repo.ListAll()
 }
+
+// ListByCourseID lấy danh sách bài tập theo môn học
+func (s *Service) ListByCourseID(courseID int) ([]Exercise, error) {
+	return s.repo.ListByCourseID(courseID)
+}
+
+// GetCourseStructure lấy cấu trúc môn học gồm các chương và bài tập (an toàn cho client)
+func (s *Service) GetCourseStructure(courseID int) ([]ChapterWithExercises, error) {
+	return s.repo.GetCourseStructure(courseID)
+}

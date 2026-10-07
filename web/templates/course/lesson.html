@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }} - Web Python Platform</title>
     <link rel="stylesheet" href="/static/css/lesson.css">
+    <link rel="stylesheet" href="/static/css/visualization.css">
     <!-- Skulpt Runtime -->
     <script src="/static/js/skulpt.min.js"></script>
     <script src="/static/js/skulpt-stdlib.js"></script>
@@ -19,13 +20,14 @@
         <nav class="nav-links">
             <a href="/courses">Môn học</a>
             <a href="/course?id={{ .Lesson.CourseID }}">{{ .Lesson.CourseCode }}</a>
-            <a href="/ide">Luyện tập (IDE)</a>
+            <a href="/ide?mode=practice&course={{ .Lesson.CourseCode }}">Luyện tập (IDE)</a>
         </nav>
         <div class="nav-user">
             {{ if .User }}
                 <span>{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -68,6 +70,37 @@
                 {{ .Lesson.SafeHTML }}
             </article>
 
+            {{ if .Lesson.VisualizationType }}
+            <!-- Khung mô phỏng trực quan thuật toán (Learning Aid - Phase 6) -->
+            <div id="visualizationSection" class="visualization-section" style="margin-bottom: 24px;">
+                <div class="viz-card">
+                    <div class="viz-header">
+                        <div class="viz-header-left">
+                            <span class="viz-badge" id="vizBadge">&#128202; Mô phỏng</span>
+                            <span class="viz-title" id="vizTitle">Mô phỏng thuật toán</span>
+                        </div>
+                        <div class="viz-controls">
+                            <button id="btnVizPrev" class="viz-btn viz-btn-secondary" title="Bước trước (Previous)">
+                                <span>&#9664;</span> Trước
+                            </button>
+                            <button id="btnVizAutoPlay" class="viz-btn viz-btn-secondary" title="Tự động chạy (Auto Play)">
+                                <span class="icon">&#9658;</span> Tự động
+                            </button>
+                            <button id="btnVizNext" class="viz-btn viz-btn-secondary" title="Bước tiếp (Next)">
+                                Tiếp <span>&#9654;</span>
+                            </button>
+                            <button id="btnVizReset" class="viz-btn viz-btn-secondary" title="Đặt lại từ đầu (Reset)">
+                                <span>&#8635;</span> Đặt lại
+                            </button>
+                            <span id="vizStepCounter" class="viz-step-counter">1 / 1</span>
+                        </div>
+                    </div>
+                    <div id="vizStage" class="viz-stage"></div>
+                    <div id="vizExplanation" class="viz-explanation-box"></div>
+                </div>
+            </div>
+            {{ end }}
+
             <!-- Trình chạy thử code ví dụ -->
             <div class="runner-box">
                 <div class="runner-header">
@@ -82,7 +115,7 @@
 
             <div style="display: flex; justify-content: space-between; margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--border-color);">
                 <a href="/course?id={{ .Lesson.CourseID }}" class="btn btn-secondary">&larr; Trở về môn học</a>
-                <a href="/ide" class="btn btn-primary">Luyện tập bài tập trên IDE &rarr;</a>
+                <a href="/ide?mode=practice&course={{ .Lesson.CourseCode }}" class="btn btn-primary">Luyện tập bài tập trên IDE &rarr;</a>
             </div>
         </main>
     </div>
@@ -116,5 +149,21 @@
             });
         });
     </script>
+    {{ if .Lesson.VisualizationType }}
+    <script src="/static/js/visualization/binary-search.js"></script>
+    <script src="/static/js/visualization/array.js"></script>
+    <script src="/static/js/visualization/stack.js"></script>
+    <script src="/static/js/visualization/sorting.js"></script>
+    <script src="/static/js/visualization/manager.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.VisualizationManager) {
+                window.VisualizationManager.load({
+                    visualization_type: {{ .Lesson.VisualizationType }}
+                });
+            }
+        });
+    </script>
+    {{ end }}
 </body>
 </html>

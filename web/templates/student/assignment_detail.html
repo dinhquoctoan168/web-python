@@ -42,11 +42,11 @@
             <span>Web Python <strong>Platform</strong></span>
         </a>
         <nav class="nav-links">
+            <a href="/dashboard">Tổng quan</a>
             <a href="/courses">Môn học</a>
-            <a href="/teacher/courses">Quản lý Môn</a>
-            <a href="/teacher/classes">Quản lý Lớp</a>
-            <a href="/teacher/assignments" class="active">Giao bài tập</a>
-            <a href="/teacher/submissions">Lịch sử nộp bài</a>
+            <a href="/my-classes">Lớp học của tôi</a>
+            <a href="/my-assignments" class="active">Bài tập được giao</a>
+            <a href="/my-exams">Kỳ thi</a>
             <a href="/ide">Luyện tập (IDE)</a>
         </nav>
         <div class="nav-user">
@@ -63,28 +63,13 @@
 
     <main class="container">
         <div style="margin-bottom: 20px;">
-            <a href="/teacher/assignments" style="color: var(--accent-blue, #61afef); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách bài tập</a>
+            <a href="/my-assignments" style="color: var(--accent-blue, #61afef); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách bài tập</a>
         </div>
 
         <div class="detail-card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h1 style="font-size: 24px; margin-bottom: 8px; color: #fff;">{{ .Assignment.Title }}</h1>
-                    <p style="color: var(--text-muted); font-size: 14px; margin: 0;">{{ .Assignment.Description }}</p>
-                </div>
-                <div>
-                    {{ if eq .Assignment.Status "draft" }}
-                    <form action="/teacher/assignment/publish" method="POST" style="display: inline;">
-                        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-                        <input type="hidden" name="id" value="{{ .Assignment.ID }}">
-                        <button type="submit" class="btn btn-primary" onclick="return confirm('Bạn có chắc chắn muốn phát hành bài tập này cho sinh viên trong lớp?');">
-                            &#128640; Phát hành cho sinh viên
-                        </button>
-                    </form>
-                    {{ else }}
-                    <span class="badge badge-success" style="font-size: 14px; padding: 6px 12px;">&#10003; Đã phát hành</span>
-                    {{ end }}
-                </div>
+            <div>
+                <h1 style="font-size: 24px; margin-bottom: 8px; color: #fff;">{{ .Assignment.Title }}</h1>
+                <p style="color: var(--text-muted); font-size: 14px; margin: 0;">{{ .Assignment.Description }}</p>
             </div>
 
             <div class="meta-grid">
@@ -113,7 +98,7 @@
         </div>
 
         <div class="page-header" style="margin-bottom: 16px;">
-            <h2 style="font-size: 18px; color: #fff;">Danh sách câu hỏi trong đợt bài tập ({{ len .Assignment.Exercises }})</h2>
+            <h2 style="font-size: 18px; color: #fff;">Danh sách câu hỏi trong bài tập ({{ len .Assignment.Exercises }})</h2>
         </div>
 
         <div class="table-container">
@@ -124,8 +109,8 @@
                         <th style="width: 80px;">Mã câu</th>
                         <th>Tên bài tập</th>
                         <th style="width: 100px; text-align: center;">Độ khó</th>
-                        <th style="width: 100px; text-align: center;">Trọng số điểm</th>
-                        <th style="width: 120px; text-align: center;">Thao tác</th>
+                        <th style="width: 100px; text-align: center;">Điểm tối đa</th>
+                        <th style="width: 140px; text-align: center;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -143,15 +128,15 @@
                             <strong>{{ .Points }}</strong> đ
                         </td>
                         <td style="text-align: center;">
-                            <a href="/ide?exercise_id={{ .ExerciseID }}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">
-                                Xem trong IDE &nearr;
+                            <a href="/ide?mode=assignment&assignment_id={{ $.Assignment.ID }}&id={{ .ExerciseID }}" class="btn btn-primary" style="padding: 5px 12px; font-size: 12px;">
+                                Làm bài trên IDE &rarr;
                             </a>
                         </td>
                     </tr>
                     {{ else }}
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
-                            Chưa có câu hỏi nào được gán cho đợt bài tập này.
+                            Chưa có câu hỏi nào được gán cho bài tập này.
                         </td>
                     </tr>
                     {{ end }}

@@ -26,6 +26,7 @@
                 <span>{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -85,6 +86,7 @@
                             <div style="display: flex; gap: 6px; justify-content: center;">
                                 {{ if eq .Status "draft" }}
                                 <form action="/teacher/exam/publish" method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
                                     <input type="hidden" name="id" value="{{ .ID }}">
                                     <button type="submit" class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;">Phát hành</button>
                                 </form>

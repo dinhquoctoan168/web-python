@@ -37,7 +37,11 @@
             <button id="btnRunCode" class="btn btn-primary" title="Chạy mã (Ctrl + Enter)">
                 <span class="icon">&#9658;</span> Chạy mã (Ctrl+Enter)
             </button>
+            <button id="btnSubmitCode" class="btn btn-success" title="Nộp bài chính thức và chấm qua Server Judge" style="background-color: var(--accent-emerald, #10b981); border-color: var(--accent-emerald, #10b981); color: #fff;">
+                <span class="icon">&#128228;</span> Nộp bài
+            </button>
             <form action="/logout" method="POST" style="display:inline; margin-left: 8px;">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <button type="submit" class="btn btn-secondary" title="Đăng xuất" style="padding: 6px 12px;">
                     <span class="icon">&#10140;</span> Đăng xuất
                 </button>
@@ -232,35 +236,6 @@
                     </div>
                 </div>
 
-                <!-- Khung mô phỏng trực quan thuật toán (Phase 17) -->
-                <div id="visualizationSection" class="visualization-section" style="display: none;">
-                    <div class="viz-card">
-                        <div class="viz-header">
-                            <div class="viz-header-left">
-                                <span class="viz-badge" id="vizBadge">&#128202; Mô phỏng</span>
-                                <span class="viz-title" id="vizTitle">Mô phỏng thuật toán</span>
-                            </div>
-                            <div class="viz-controls">
-                                <button id="btnVizPrev" class="viz-btn viz-btn-secondary" title="Bước trước (Previous)">
-                                    <span>&#9664;</span> Trước
-                                </button>
-                                <button id="btnVizAutoPlay" class="viz-btn viz-btn-secondary" title="Tự động chạy (Auto Play)">
-                                    <span class="icon">&#9658;</span> Tự động
-                                </button>
-                                <button id="btnVizNext" class="viz-btn viz-btn-secondary" title="Bước tiếp (Next)">
-                                    Tiếp <span>&#9654;</span>
-                                </button>
-                                <button id="btnVizReset" class="viz-btn viz-btn-secondary" title="Đặt lại từ đầu (Reset)">
-                                    <span>&#8635;</span> Đặt lại
-                                </button>
-                                <span id="vizStepCounter" class="viz-step-counter">1 / 1</span>
-                            </div>
-                        </div>
-                        <div id="vizStage" class="viz-stage"></div>
-                        <div id="vizExplanation" class="viz-explanation-box"></div>
-                    </div>
-                </div>
-
                 <div class="editor-body" id="editorBody">
                     <div class="line-numbers" id="lineNumbers">1</div>
                     <div class="editor-code-container">
@@ -316,17 +291,26 @@
     </div>
 </div>
 
-<!-- Exercise data model -->
+<!-- Exercise and IDE context data model -->
 <script>
+    window.IDE_CONTEXT = {
+        mode: {{ .Mode }},
+        courseCode: {{ .CourseCode }},
+        assignmentId: {{ if .AssignmentID }}{{ .AssignmentID }}{{ else }}null{{ end }},
+        exerciseId: {{ if .CurrentExercise }}{{ .CurrentExercise.ID }}{{ else }}null{{ end }}
+    };
+
     window.INITIAL_EXERCISE = {{ if .CurrentExercise }} {
         id: {{ .CurrentExercise.ID }},
         title: {{ .CurrentExercise.Title }},
         difficulty: {{ .CurrentExercise.Difficulty }},
+        exerciseType: {{ .CurrentExercise.ExerciseType }},
         description: {{ .CurrentExercise.Description }},
         initialCode: {{ .CurrentExercise.InitialCode }},
         allowedFunctions: {{ .CurrentExercise.AllowedFunctions }},
         testCasesJSON: {{ .CurrentExercise.TestCasesJSON }},
-        hint: {{ .CurrentExercise.SolutionHint }}
+        hint: {{ .CurrentExercise.SolutionHint }},
+        timeLimitMS: {{ .CurrentExercise.TimeLimitMS }}
     } {{ else }} null {{ end }};
 </script>
 {{ end }}

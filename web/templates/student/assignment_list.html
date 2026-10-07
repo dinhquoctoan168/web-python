@@ -43,6 +43,7 @@
                 <span>{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -93,7 +94,7 @@
                             {{ end }}
                         </td>
                         <td style="text-align: center;">
-                            <a href="/ide" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Làm bài &rarr;</a>
+                            <a href="/assignment?id={{ .ID }}" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Chi tiết bài tập &rarr;</a>
                         </td>
                     </tr>
                     {{ else }}

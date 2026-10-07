@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const execStatus = document.getElementById('execStatus');
     const btnRunCode = document.getElementById('btnRunCode');
     const btnRunTests = document.getElementById('btnRunTests');
+    const btnSubmitCode = document.getElementById('btnSubmitCode');
     const btnResetCode = document.getElementById('btnResetCode');
     const btnClearConsole = document.getElementById('btnClearConsole');
     const dirtyIndicator = document.getElementById('dirtyIndicator');
@@ -50,6 +51,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return match ? decodeURIComponent(match[1]) : '';
     }
 
+    // Phase 4: Chuẩn hóa Model dữ liệu bài tập (Normalize Exercise DTO)
+    function normalizeExercise(raw) {
+        if (!raw) return null;
+        let testCases = [];
+        const tcRaw = raw.testCasesJSON || raw.test_cases_json || raw.testCases || raw.test_cases || '[]';
+        try {
+            testCases = typeof tcRaw === 'string' ? JSON.parse(tcRaw) : (Array.isArray(tcRaw) ? tcRaw : []);
+        } catch (e) {
+            testCases = [];
+        }
+        return {
+            id: raw.id,
+            title: raw.title || '',
+            description: raw.description || '',
+            difficulty: raw.difficulty || 'easy',
+            exerciseType: raw.exerciseType || raw.exercise_type || 'coding',
+            initialCode: raw.initialCode !== undefined ? raw.initialCode : (raw.initial_code !== undefined ? raw.initial_code : ''),
+            allowedFunctions: raw.allowedFunctions || raw.allowed_functions || [],
+            solutionHint: raw.solutionHint || raw.solution_hint || raw.hint || '',
+            testCases: testCases,
+            testCasesJSON: typeof tcRaw === 'string' ? tcRaw : JSON.stringify(testCases),
+            timeLimitMS: raw.timeLimitMS || raw.time_limit_ms || 3000
+        };
+    }
+
     // --- Quản lý tiến độ luyện tập & Tự động lưu (Phase 7: Student Practice) ---
     function setSaveStatus(state) {
         if (!saveStatus) return;
@@ -64,13 +90,50 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     let autoSaveTimer = null;
+    let pendingSave = null;
+
+    // Phase 3: Snapshot ngay lập tức exerciseId và codeSnapshot khi kích hoạt autosave
     function triggerAutoSave() {
         if (!currentExercise) return;
+        const exerciseId = currentExercise.id;
+        const codeSnapshot = codeEditor.value;
+
+        pendingSave = { exerciseId: exerciseId, code: codeSnapshot };
         setSaveStatus('saving');
+
         if (autoSaveTimer) clearTimeout(autoSaveTimer);
         autoSaveTimer = setTimeout(function() {
-            saveDraftCode(currentExercise.id, codeEditor.value);
-        }, 2500); // 2.5 giây debounce
+            saveDraftCode(exerciseId, codeSnapshot);
+            pendingSave = null;
+        }, 1500); // 1.5 giây debounce
+    }
+
+    // Phase 3: Flush nháp đang chờ trước khi đổi câu hoặc nộp bài
+    async function flushCurrentDraft() {
+        if (autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
+        if (pendingSave && pendingSave.exerciseId) {
+            const exerciseId = pendingSave.exerciseId;
+            const code = pendingSave.code;
+            pendingSave = null;
+            try {
+                const res = await fetch('/api/practice/save', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': getCsrfToken()
+                    },
+                    body: JSON.stringify({ exercise_id: exerciseId, code: code })
+                });
+                if (res.ok) {
+                    setSaveStatus('saved');
+                }
+            } catch (err) {
+                console.error('Lỗi flush bản nháp:', err);
+            }
+        }
     }
 
     function saveDraftCode(exerciseId, code) {
@@ -136,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    // Phase 3: Ngăn chặn race condition khi nạp bản nháp
     function loadSavedDraft(exerciseId) {
         fetch(`/api/practice/state?exercise_id=${exerciseId}`)
             .then(res => {
@@ -143,11 +207,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return res.json();
             })
             .then(state => {
+                // Kiểm tra người dùng có còn ở đúng bài tập này hay đã chuyển bài
+                if (!currentExercise || currentExercise.id !== exerciseId) {
+                    return;
+                }
                 if (state && state.last_code && state.last_code.trim() !== '') {
                     codeEditor.value = state.last_code;
                     updateLineNumbers();
                     updateHighlighting();
-                    const initial = currentExercise.initialCode || currentExercise.initial_code || '';
+                    const initial = currentExercise.initialCode || '';
                     if (state.last_code !== initial) {
                         dirtyIndicator.style.display = 'inline';
                     } else {
@@ -391,8 +459,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 5. Cập nhật giao diện bài tập hiện tại
     window.renderExerciseDetails = function(ex) {
-        currentExercise = ex;
         if (!ex) return;
+        ex = normalizeExercise(ex);
+        currentExercise = ex;
 
         // Cập nhật header
         const topTitle = document.getElementById('topExerciseTitle');
@@ -409,10 +478,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const problemHint = document.getElementById('problemHint');
         if (problemTitle) problemTitle.textContent = ex.title;
         if (problemDesc) problemDesc.textContent = ex.description;
-        if (problemHint) problemHint.textContent = ex.hint || ex.solution_hint || 'Không có gợi ý.';
+        if (problemHint) problemHint.textContent = ex.solutionHint || 'Không có gợi ý.';
 
         // Cập nhật Allowed functions chips
-        const allowed = ex.allowedFunctions || ex.allowed_functions || [];
+        const allowed = ex.allowedFunctions || [];
         if (problemAllowedChips) {
             problemAllowedChips.innerHTML = allowed.map(fn => `<span class="func-chip">${escapeHtml(fn)}()</span>`).join('');
         }
@@ -444,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             let hintHtml = '';
-            const hint = ex.hint || ex.solution_hint;
+            const hint = ex.solutionHint;
             if (hint) {
                 hintHtml = `<div class="inline-hint-box"><strong>Gợi ý:</strong> ${escapeHtml(hint)}</div>`;
             }
@@ -463,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Đặt lại mã nguồn
-        codeEditor.value = ex.initialCode || ex.initial_code || '';
+        codeEditor.value = ex.initialCode || '';
         dirtyIndicator.style.display = 'none';
         updateLineNumbers();
         updateHighlighting();
@@ -471,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Xử lý bài tập trắc nghiệm / Code Tracing (Phase 13)
         const quizSection = document.getElementById('quizSection');
         const editorBody = document.getElementById('editorBody');
-        const isQuiz = (ex.exercise_type === 'multiple_choice' || ex.exercise_type === 'quiz');
+        const isQuiz = (ex.exerciseType === 'multiple_choice' || ex.exerciseType === 'quiz');
 
         if (quizSection) {
             if (isQuiz) {
@@ -492,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (editorBody) {
-            const hasInitialCode = (ex.initialCode || ex.initial_code || '').trim().length > 0;
+            const hasInitialCode = (ex.initialCode || '').trim().length > 0;
             if (isQuiz && !hasInitialCode) {
                 editorBody.style.display = 'none';
             } else {
@@ -502,11 +571,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Nạp bản nháp đã lưu của học viên từ server (nếu có)
         loadSavedDraft(ex.id);
-
-        // Phase 17: Xử lý mô phỏng trực quan thuật toán (Algorithm Visualization)
-        if (window.VisualizationManager) {
-            window.VisualizationManager.load(ex);
-        }
     };
 
     // Phase 13: Tải các lựa chọn trắc nghiệm từ API bảo mật (tuyệt đối không lộ đáp án đúng)
@@ -623,23 +687,78 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // 6. Tải bài tập khi người dùng bấm chọn
-    window.loadExercise = function(id) {
-        fetch(`/api/exercise?id=${id}`)
-            .then(res => res.json())
-            .then(ex => {
-                // Cập nhật danh sách active
-                document.querySelectorAll('.exercise-item').forEach(item => {
-                    item.classList.remove('active');
-                    if (parseInt(item.getAttribute('data-id')) === id) {
-                        item.classList.add('active');
-                    }
-                });
-                renderExerciseDetails(ex);
-            })
-            .catch(err => {
-                console.error('Lỗi khi nạp bài tập:', err);
+    let exerciseLoadController = null;
+
+    function showExerciseLoading(id) {
+        const drawer = document.getElementById(`inlineProblem-${id}`);
+        if (drawer) {
+            drawer.innerHTML = '<div class="inline-problem-desc" style="color:var(--text-muted); padding: 8px 0;">&#8635; Đang tải bài tập...</div>';
+            drawer.classList.remove('collapsed');
+        }
+        if (execStatus) {
+            execStatus.textContent = "Đang tải bài...";
+            execStatus.style.color = "var(--accent-amber)";
+        }
+    }
+
+    function showExerciseError(id, msg) {
+        const drawer = document.getElementById(`inlineProblem-${id}`);
+        if (drawer) {
+            drawer.innerHTML = `<div class="inline-problem-desc" style="color:var(--accent-red); padding: 8px 0;">&#9888; Lỗi tải bài: ${escapeHtml(msg)}. <a href="javascript:void(0)" onclick="loadExercise(${id})" style="color:var(--accent-blue); text-decoration: underline; margin-left: 6px;">Thử lại</a></div>`;
+            drawer.classList.remove('collapsed');
+        }
+        if (execStatus) {
+            execStatus.textContent = "Lỗi tải bài";
+            execStatus.style.color = "var(--accent-red)";
+        }
+    }
+
+    // 6. Tải bài tập khi người dùng bấm chọn (Phase 3 & 4)
+    window.loadExercise = async function(id) {
+        await flushCurrentDraft();
+
+        if (exerciseLoadController) {
+            exerciseLoadController.abort();
+        }
+        exerciseLoadController = new AbortController();
+
+        showExerciseLoading(id);
+
+        try {
+            const res = await fetch(`/api/exercise?id=${id}`, {
+                signal: exerciseLoadController.signal
             });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const raw = await res.json();
+            if (!raw || raw.id !== id) return;
+
+            const ex = normalizeExercise(raw);
+
+            // Cập nhật URL trình duyệt (history.replaceState) giữ context
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('id', id);
+                window.history.replaceState({}, '', url.toString());
+            } catch (e) {}
+
+            // Cập nhật danh sách active
+            document.querySelectorAll('.exercise-item').forEach(item => {
+                item.classList.remove('active');
+                if (parseInt(item.getAttribute('data-id'), 10) === id) {
+                    item.classList.add('active');
+                }
+            });
+
+            renderExerciseDetails(ex);
+            if (execStatus) {
+                execStatus.textContent = "Sẵn sàng";
+                execStatus.style.color = "var(--text-muted)";
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') return;
+            console.error('Lỗi khi nạp bài tập:', err);
+            showExerciseError(id, err.message);
+        }
     };
 
     // 7. Chạy mã Python
@@ -750,20 +869,97 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 `).join('');
 
-                // Ghi nhận kết quả luyện tập vào cơ sở dữ liệu (Phase 7: Practice & Phase 8: Submission)
+                // Ghi nhận kết quả luyện tập nháp vào cơ sở dữ liệu (Phase 7: Public Test only)
                 if (currentExercise && totalCount > 0) {
                     const passed = (passCount === totalCount);
                     const score = (passCount / totalCount) * 100;
                     submitPracticeResult(currentExercise.id, code, score, passed);
-                    createSubmission(currentExercise.id, code, score, passCount, totalCount);
                 }
             }
         );
     }
 
+    // 9. Nộp bài chính thức (Submit Solution qua Server Judge - Phase 7)
+    async function submitSolution() {
+        if (!currentExercise) return;
+        if (currentExercise.exerciseType === 'multiple_choice' || currentExercise.exerciseType === 'quiz') {
+            submitQuizChoice();
+            return;
+        }
+
+        const code = codeEditor.value;
+        const allowed = currentExercise.allowedFunctions || [];
+
+        // Kiểm tra whitelist
+        const check = PythonEngine.validateCode(code, allowed);
+        if (!check.isValid) {
+            alert('Mã nguồn vi phạm quy tắc hàm cho phép: ' + check.errorMsg);
+            return;
+        }
+
+        if (btnSubmitCode) {
+            btnSubmitCode.disabled = true;
+            btnSubmitCode.innerHTML = '<span class="icon">&#8635;</span> Đang nộp...';
+        }
+        if (execStatus) {
+            execStatus.textContent = "Đang chấm server judge...";
+            execStatus.style.color = "var(--accent-amber)";
+        }
+
+        await flushCurrentDraft();
+
+        fetch('/api/submissions', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': getCsrfToken()
+            },
+            body: JSON.stringify({
+                exercise_id: currentExercise.id,
+                source_code: code
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            if (btnSubmitCode) {
+                btnSubmitCode.disabled = false;
+                btnSubmitCode.innerHTML = '<span class="icon">&#128228;</span> Nộp bài';
+            }
+            if (data && data.judge) {
+                const j = data.judge;
+                const passed = (j.status === 'passed' || (j.passed_tests === j.total_tests && j.total_tests > 0));
+                if (execStatus) {
+                    execStatus.textContent = passed ? `Đạt ${j.passed_tests}/${j.total_tests} test` : `Không đạt (${j.passed_tests}/${j.total_tests})`;
+                    execStatus.style.color = passed ? "var(--accent-emerald)" : "var(--accent-red)";
+                }
+                updateExerciseBullet(currentExercise.id, passed ? 'completed' : 'in_progress');
+                alert(`Kết quả chấm bài chính thức (Server Judge):\n- Trạng thái: ${j.status === 'passed' ? 'ĐẠT (PASS)' : 'KHÔNG ĐẠT (FAIL)'}\n- Điểm số: ${j.score}\n- Test cases: ${j.passed_tests}/${j.total_tests}`);
+            } else {
+                alert('Đã gửi bài nộp thành công!');
+            }
+        })
+        .catch(err => {
+            if (btnSubmitCode) {
+                btnSubmitCode.disabled = false;
+                btnSubmitCode.innerHTML = '<span class="icon">&#128228;</span> Nộp bài';
+            }
+            if (execStatus) {
+                execStatus.textContent = "Lỗi nộp bài";
+                execStatus.style.color = "var(--accent-red)";
+            }
+            alert('Lỗi nộp bài lên máy chủ: ' + err.message);
+        });
+    }
+
     // Event Listeners
     btnRunCode.addEventListener('click', runCode);
     btnRunTests.addEventListener('click', runTests);
+    if (btnSubmitCode) {
+        btnSubmitCode.addEventListener('click', submitSolution);
+    }
 
     btnResetCode.addEventListener('click', function() {
         if (currentExercise) {

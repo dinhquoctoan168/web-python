@@ -112,15 +112,25 @@ func TestExamFullLifecycle(t *testing.T) {
 	codeQ1 := "def double_val(n): return n * 2"
 	codeQ2 := "def cube_val(n): return 0"
 
-	if err := svc.SaveAnswerDraft(session.ID, 101, codeQ1); err != nil {
+	// Kiểm tra quyền sở hữu: student khác không thể lưu nháp vào session này
+	if err := svc.SaveAnswerDraft(session.ID, 999, 101, codeQ1); err == nil {
+		t.Fatalf("Kỳ vọng lỗi khi student 999 cố lưu nháp vào session của student %d", session.StudentID)
+	}
+
+	if err := svc.SaveAnswerDraft(session.ID, session.StudentID, 101, codeQ1); err != nil {
 		t.Fatalf("SaveAnswerDraft câu 1 thất bại: %v", err)
 	}
-	if err := svc.SaveAnswerDraft(session.ID, 102, codeQ2); err != nil {
+	if err := svc.SaveAnswerDraft(session.ID, session.StudentID, 102, codeQ2); err != nil {
 		t.Fatalf("SaveAnswerDraft câu 2 thất bại: %v", err)
 	}
 
+	// Kiểm tra quyền sở hữu: student khác không thể nộp bài session này
+	if _, err := svc.SubmitExam(session.ID, 999); err == nil {
+		t.Fatalf("Kỳ vọng lỗi khi student 999 cố nộp bài session của student %d", session.StudentID)
+	}
+
 	// 6. Nộp bài thi và chấm điểm tổng kết bằng Server-Side Judge
-	finalScore, err := svc.SubmitExam(session.ID)
+	finalScore, err := svc.SubmitExam(session.ID, session.StudentID)
 	if err != nil {
 		t.Fatalf("SubmitExam thất bại: %v", err)
 	}
@@ -196,13 +206,13 @@ func TestExam_StudentCannotSubmitAfterDeadline(t *testing.T) {
 	}
 
 	// 1. Lưu nháp code sau hạn chót -> Bị từ chối ErrSessionClosed
-	err = svc.SaveAnswerDraft(session.ID, 101, "def double_val(n): return n * 2")
+	err = svc.SaveAnswerDraft(session.ID, session.StudentID, 101, "def double_val(n): return n * 2")
 	if !errors.Is(err, ErrSessionClosed) {
 		t.Errorf("Lưu nháp sau deadline kỳ vọng ErrSessionClosed, nhận: %v", err)
 	}
 
 	// 2. Nộp bài sau hạn chót -> Bị từ chối ErrSessionClosed
-	_, err = svc.SubmitExam(session.ID)
+	_, err = svc.SubmitExam(session.ID, session.StudentID)
 	if !errors.Is(err, ErrSessionClosed) {
 		t.Errorf("Nộp bài sau deadline kỳ vọng ErrSessionClosed, nhận: %v", err)
 	}

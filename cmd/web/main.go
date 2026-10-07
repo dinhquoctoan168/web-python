@@ -23,6 +23,7 @@ import (
 	"web_python/internal/exam"
 	"web_python/internal/exercise"
 	"web_python/internal/frontend"
+	"web_python/internal/ide"
 	"web_python/internal/judge"
 	"web_python/internal/lesson"
 	"web_python/internal/practice"
@@ -157,6 +158,8 @@ func main() {
 		return lessonService.GetCurriculum(courseID, isTeacher)
 	})
 
+	ideHandler := ide.NewHandler(courseService, lessonService, exerciseService, assignmentService)
+
 	// 4. Thiết lập Mux định tuyến thuần standard library
 	mux := http.NewServeMux()
 
@@ -183,7 +186,9 @@ func main() {
 	mux.HandleFunc("/api/course/curriculum", auth.RequireLogin(lessonHandler.HandleAPICourseCurriculum))
 	mux.HandleFunc("/my-classes", auth.RequireLogin(classHandler.HandleStudentMyClasses))
 	mux.HandleFunc("/my-assignments", auth.RequireLogin(assignmentHandler.HandleStudentMyAssignments))
+	mux.HandleFunc("/assignment", auth.RequireLogin(assignmentHandler.HandleStudentAssignmentDetail))
 	mux.HandleFunc("/my-exams", auth.RequireLogin(examHandler.HandleStudentMyExams))
+	mux.HandleFunc("/student/exams", auth.RequireLogin(examHandler.HandleStudentMyExams))
 	mux.HandleFunc("/exam/take", auth.RequireLogin(examHandler.HandleStudentTakeExam))
 
 	// Tuyến đường quản lý môn học, lớp học & chương trình giảng dạy (Giảng viên)
@@ -226,7 +231,7 @@ func main() {
 	mux.HandleFunc("/teacher/submission/view", auth.RequireTeacher(submissionHandler.HandleTeacherSubmissionView))
 
 	// Trang giao diện IDE (yêu cầu đăng nhập)
-	mux.HandleFunc("/ide", auth.RequireLogin(frontend.HandleIDE))
+	mux.HandleFunc("/ide", auth.RequireLogin(ideHandler.HandleIDE))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)

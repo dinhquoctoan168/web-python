@@ -20,7 +20,7 @@
             <a href="/teacher/curriculum">&#128214; Nội dung</a>
             <a href="/ide">&#128187; Ngân hàng bài tập</a>
             <a href="/teacher/assignments">&#128221; Bài tập</a>
-            <a href="/teacher/exam/monitoring">&#9201; Kiểm tra</a>
+            <a href="/teacher/exams">&#9201; Kiểm tra</a>
             <a href="/teacher/classes" class="active">&#128101; Sinh viên</a>
             <a href="/teacher/class/analytics?class_id={{ .ClassID }}">&#128200; Thống kê</a>
         </nav>
@@ -29,6 +29,7 @@
                 <span class="user-name">{{ .User.FullName }}</span>
                 <span class="badge-role teacher">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
                 </form>
             {{ end }}

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ if .CSRFToken }}{{ .CSRFToken }}{{ end }}">
     <title>Phòng thi: {{ .Exam.Title }} - Web Python Platform</title>
     <link rel="stylesheet" href="/static/css/class.css">
     <style>
@@ -229,29 +230,45 @@
             });
         }
 
-        // Lưu câu trả lời tự động (Debounce)
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && meta.content) return meta.content;
+            const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : '';
+        }
+
+        // Lưu câu trả lời lên server
+        function saveAnswerDraft(exerciseId, code) {
+            return fetch('/api/exam/save-answer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    session_id: sessionID,
+                    exercise_id: exerciseId,
+                    source_code: code
+                })
+            }).then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                saveStatus.textContent = "Đã lưu tự động (" + new Date().toLocaleTimeString() + ")";
+            }).catch(() => {
+                saveStatus.textContent = "Lỗi lưu mã nguồn";
+            });
+        }
+
+        // Lưu câu trả lời tự động (Debounce với snapshot)
         function triggerAutoSave() {
+            const q = examQuestions[currentQuestionIdx];
+            if (!q) return;
+            const codeSnapshot = codeEditor.value;
+            answers[q.id] = codeSnapshot;
+
             saveStatus.textContent = "Đang lưu...";
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
-                const q = examQuestions[currentQuestionIdx];
-                if (!q) return;
-                const code = codeEditor.value;
-                answers[q.id] = code;
-
-                fetch('/api/exam/save-answer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: sessionID,
-                        exercise_id: q.id,
-                        source_code: code
-                    })
-                }).then(() => {
-                    saveStatus.textContent = "Đã lưu tự động (" + new Date().toLocaleTimeString() + ")";
-                }).catch(() => {
-                    saveStatus.textContent = "Lỗi lưu mã nguồn";
-                });
+                saveAnswerDraft(q.id, codeSnapshot);
             }, 800);
         }
 
@@ -269,11 +286,27 @@
             }
         });
 
+        // Chuyển câu hỏi có flush draft câu hiện tại
+        function switchQuestion(idx) {
+            if (idx === currentQuestionIdx) return;
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+                saveTimeout = null;
+            }
+            const currentQ = examQuestions[currentQuestionIdx];
+            if (currentQ) {
+                const currentCode = codeEditor.value;
+                answers[currentQ.id] = currentCode;
+                saveAnswerDraft(currentQ.id, currentCode);
+            }
+            loadQuestion(idx);
+        }
+
         // Chuyển câu hỏi khi click sidebar
         qItems.forEach(item => {
             item.addEventListener('click', function() {
                 const idx = parseInt(this.getAttribute('data-index'), 10);
-                loadQuestion(idx);
+                switchQuestion(idx);
             });
         });
 
@@ -299,23 +332,39 @@
         }
 
         // Nộp bài thi
-        function submitExam(autoSubmit) {
+        async function submitExam(autoSubmit) {
             if (!autoSubmit && !confirm("Bạn có chắc chắn muốn nộp bài thi ngay bây giờ? Sau khi nộp bạn sẽ không thể sửa đổi bài làm.")) {
                 return;
             }
 
-            // Lưu câu hiện tại trước khi submit
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+                saveTimeout = null;
+            }
+
+            // Flush câu hiện tại lên server trước khi submit
             const q = examQuestions[currentQuestionIdx];
             if (q) {
                 answers[q.id] = codeEditor.value;
+                try {
+                    await saveAnswerDraft(q.id, codeEditor.value);
+                } catch (e) {
+                    console.error("Flush draft error:", e);
+                }
             }
 
             fetch('/api/exam/submit', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
                 body: JSON.stringify({ session_id: sessionID })
             })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
             .then(data => {
                 alert(`Bài thi đã được nộp thành công! Điểm tổng kết: ${data.final_score} điểm.`);
                 window.location.href = '/my-exams';
@@ -331,7 +380,10 @@
         function reportExamEvent(eventType, eventData) {
             fetch('/api/exam/event', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
                 body: JSON.stringify({
                     session_id: sessionID,
                     event_type: eventType,

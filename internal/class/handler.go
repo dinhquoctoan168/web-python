@@ -9,6 +9,7 @@ import (
 
 	"web_python/internal/auth"
 	"web_python/internal/course"
+	"web_python/internal/frontend"
 )
 
 // Handler quản lý các HTTP endpoints của lớp học
@@ -51,7 +52,7 @@ func (h *Handler) HandleTeacherListClasses(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "classes.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "classes.html"), map[string]any{
 		"Title":   "Quản lý Lớp học",
 		"Classes": classes,
 		"Courses": courses,
@@ -61,6 +62,12 @@ func (h *Handler) HandleTeacherListClasses(w http.ResponseWriter, r *http.Reques
 
 // HandleTeacherClassDetail xem chi tiết lớp học và danh sách sinh viên (GET /teacher/class?id=)
 func (h *Handler) HandleTeacherClassDetail(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
@@ -69,16 +76,20 @@ func (h *Handler) HandleTeacherClassDetail(w http.ResponseWriter, r *http.Reques
 	}
 
 	cl, students, err := h.service.GetClassDetail(id)
-	if err != nil {
-		http.Error(w, "Không tìm thấy lớp học: "+err.Error(), http.StatusNotFound)
+	if err != nil || cl == nil {
+		http.Error(w, "Không tìm thấy lớp học", http.StatusNotFound)
 		return
 	}
 
-	user := auth.GetUser(r.Context())
+	if user.Role != auth.RoleAdmin && cl.TeacherID != user.ID {
+		http.Error(w, "Bạn không có quyền quản lý lớp học này", http.StatusForbidden)
+		return
+	}
+
 	msg := r.URL.Query().Get("msg")
 	errMsg := r.URL.Query().Get("error")
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "class_detail.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "class_detail.html"), map[string]any{
 		"Title":    "Lớp: " + cl.Name,
 		"Class":    cl,
 		"Students": students,
@@ -122,6 +133,12 @@ func (h *Handler) HandleTeacherCreateClass(w http.ResponseWriter, r *http.Reques
 
 // HandleTeacherEnrollStudent thêm sinh viên vào lớp (POST /teacher/class/enroll)
 func (h *Handler) HandleTeacherEnrollStudent(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
 		return
@@ -130,6 +147,11 @@ func (h *Handler) HandleTeacherEnrollStudent(w http.ResponseWriter, r *http.Requ
 	classID, err := strconv.Atoi(r.FormValue("class_id"))
 	if err != nil || classID <= 0 {
 		http.Error(w, "ID lớp học không hợp lệ", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.VerifyTeacherOwnership(classID, user.ID, user.Role == auth.RoleAdmin); err != nil {
+		http.Error(w, "Bạn không có quyền quản lý lớp học này", http.StatusForbidden)
 		return
 	}
 
@@ -144,6 +166,12 @@ func (h *Handler) HandleTeacherEnrollStudent(w http.ResponseWriter, r *http.Requ
 
 // HandleTeacherRemoveStudent xoá sinh viên khỏi lớp (POST /teacher/class/remove-student)
 func (h *Handler) HandleTeacherRemoveStudent(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Dữ liệu không hợp lệ", http.StatusBadRequest)
 		return
@@ -157,6 +185,11 @@ func (h *Handler) HandleTeacherRemoveStudent(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if err := h.service.VerifyTeacherOwnership(classID, user.ID, user.Role == auth.RoleAdmin); err != nil {
+		http.Error(w, "Bạn không có quyền quản lý lớp học này", http.StatusForbidden)
+		return
+	}
+
 	if err := h.service.RemoveStudent(classID, studentID); err != nil {
 		http.Redirect(w, r, "/teacher/class?id="+strconv.Itoa(classID)+"&error="+err.Error(), http.StatusSeeOther)
 		return
@@ -164,6 +197,7 @@ func (h *Handler) HandleTeacherRemoveStudent(w http.ResponseWriter, r *http.Requ
 
 	http.Redirect(w, r, "/teacher/class?id="+strconv.Itoa(classID)+"&msg=Đã xoá sinh viên khỏi lớp", http.StatusSeeOther)
 }
+
 
 // HandleStudentMyClasses hiển thị danh sách lớp học của sinh viên (GET /my-classes)
 func (h *Handler) HandleStudentMyClasses(w http.ResponseWriter, r *http.Request) {
@@ -188,15 +222,19 @@ func (h *Handler) HandleStudentMyClasses(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "student", "classes.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "classes.html"), map[string]any{
 		"Title":   "Lớp học của tôi",
 		"Classes": classes,
 		"User":    user,
 	})
 }
 
-func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
-	tmpl, err := template.ParseFiles(tmplPath)
+func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPath string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		frontend.InjectCSRFToMap(r, m)
+	}
+	resolvedPath := frontend.ResolveTemplatePath(tmplPath)
+	tmpl, err := template.ParseFiles(resolvedPath)
 	if err != nil {
 		http.Error(w, "Không tìm thấy giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

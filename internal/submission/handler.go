@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"web_python/internal/auth"
+	"web_python/internal/security"
 )
 
 type Handler struct {
@@ -117,6 +118,7 @@ func (h *Handler) HandleGetMySubmissions(w http.ResponseWriter, r *http.Request)
 // TeacherSubmissionsPageData chứa dữ liệu truyền vào template giảng viên
 type TeacherSubmissionsPageData struct {
 	User        *auth.User
+	CSRFToken   string
 	Submissions []Submission
 	History     *StudentHistoryView
 	Submission  *Submission
@@ -130,6 +132,7 @@ func (h *Handler) HandleTeacherSubmissions(w http.ResponseWriter, r *http.Reques
 
 	var data TeacherSubmissionsPageData
 	data.User = user
+	data.CSRFToken = security.GetTokenFromContext(r.Context())
 
 	if studentIDStr != "" && exerciseIDStr != "" {
 		studentID, _ := strconv.Atoi(studentIDStr)
@@ -177,6 +180,7 @@ func (h *Handler) HandleTeacherSubmissionView(w http.ResponseWriter, r *http.Req
 
 	data := TeacherSubmissionsPageData{
 		User:       user,
+		CSRFToken:  security.GetTokenFromContext(r.Context()),
 		Submission: sub,
 	}
 

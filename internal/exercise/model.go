@@ -68,3 +68,13 @@ type ClientExerciseDetail struct {
 	TestCases         []PublicTestCase `json:"test_cases"`
 	TestCasesJSON     string           `json:"test_cases_json"`
 }
+
+// ChapterWithExercises chứa thông tin chương mục kèm danh sách bài tập (an toàn cho client)
+type ChapterWithExercises struct {
+	ID          int                    `json:"id"`
+	CourseID    int                    `json:"course_id"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description,omitempty"`
+	OrderNum    int                    `json:"order_num"`
+	Exercises   []ClientExerciseDetail `json:"exercises"`
+}

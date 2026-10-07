@@ -11,6 +11,7 @@ import (
 	"web_python/internal/auth"
 	"web_python/internal/class"
 	"web_python/internal/exercise"
+	"web_python/internal/frontend"
 )
 
 type Handler struct {
@@ -41,7 +42,7 @@ func (h *Handler) HandleTeacherListExams(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "exam_list.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "exam_list.html"), map[string]any{
 		"Title": "Quản lý Bài thi & Kiểm tra",
 		"Exams": exams,
 		"User":  user,
@@ -68,7 +69,7 @@ func (h *Handler) HandleTeacherNewExamForm(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "exam_form.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "exam_form.html"), map[string]any{
 		"Title":     "Tạo đề thi mới",
 		"Classes":   classes,
 		"Exercises": exercises,
@@ -136,9 +137,26 @@ func (h *Handler) HandleTeacherPublishExam(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.Error(w, "ID không hợp lệ", http.StatusBadRequest)
+		return
+	}
+
+	ex, err := h.examService.GetExam(id)
+	if err != nil || ex == nil {
+		http.Error(w, "Không tìm thấy bài thi", http.StatusNotFound)
+		return
+	}
+
+	if user.Role != auth.RoleAdmin && ex.CreatedBy != user.ID {
+		http.Error(w, "Bạn không có quyền phát hành bài thi này", http.StatusForbidden)
 		return
 	}
 
@@ -164,7 +182,7 @@ func (h *Handler) HandleStudentMyExams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "student", "exam_list.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "exam_list.html"), map[string]any{
 		"Title": "Bài kiểm tra & Thi cử",
 		"Exams": exams,
 		"User":  user,
@@ -193,7 +211,7 @@ func (h *Handler) HandleStudentTakeExam(w http.ResponseWriter, r *http.Request) 
 
 	answersJSON, _ := json.Marshal(answers)
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "student", "exam_runner.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "exam_runner.html"), map[string]any{
 		"Title":       exam.Title,
 		"Exam":        exam,
 		"Session":     session,
@@ -227,7 +245,7 @@ func (h *Handler) HandleAPISaveAnswer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.examService.SaveAnswerDraft(req.SessionID, req.ExerciseID, req.SourceCode); err != nil {
+	if err := h.examService.SaveAnswerDraft(req.SessionID, user.ID, req.ExerciseID, req.SourceCode); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -259,7 +277,7 @@ func (h *Handler) HandleAPISubmitExam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	finalScore, err := h.examService.SubmitExam(req.SessionID)
+	finalScore, err := h.examService.SubmitExam(req.SessionID, user.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -297,7 +315,7 @@ func (h *Handler) HandleAPIRecordExamEvent(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.examService.RecordSessionEvent(req.SessionID, req.EventType, req.EventData); err != nil {
+	if err := h.examService.RecordSessionEvent(req.SessionID, user.ID, req.EventType, req.EventData); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -314,19 +332,31 @@ func (h *Handler) HandleTeacherExamMonitoring(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	examID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	examIDStr := r.URL.Query().Get("id")
+	if examIDStr == "" {
+		// Điều hướng thân thiện về danh sách bài thi nếu thiếu query param id
+		http.Redirect(w, r, "/teacher/exams", http.StatusSeeOther)
+		return
+	}
+
+	examID, err := strconv.Atoi(examIDStr)
 	if err != nil || examID <= 0 {
-		http.Error(w, "ID bài thi không hợp lệ", http.StatusBadRequest)
+		http.Redirect(w, r, "/teacher/exams", http.StatusSeeOther)
 		return
 	}
 
 	exam, summaries, err := h.examService.GetMonitoringReport(examID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	if err != nil || exam == nil {
+		http.Error(w, "Không tìm thấy bài thi", http.StatusNotFound)
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "exam_monitoring.html"), map[string]any{
+	if user.Role != auth.RoleAdmin && exam.CreatedBy != user.ID {
+		http.Error(w, "Bạn không có quyền giám sát bài thi này", http.StatusForbidden)
+		return
+	}
+
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "exam_monitoring.html"), map[string]any{
 		"Title":     "Giám sát phòng thi: " + exam.Title,
 		"Exam":      exam,
 		"Summaries": summaries,
@@ -334,8 +364,12 @@ func (h *Handler) HandleTeacherExamMonitoring(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
-	tmpl, err := template.ParseFiles(tmplPath)
+func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPath string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		frontend.InjectCSRFToMap(r, m)
+	}
+	resolvedPath := frontend.ResolveTemplatePath(tmplPath)
+	tmpl, err := template.ParseFiles(resolvedPath)
 	if err != nil {
 		http.Error(w, "Lỗi nạp giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

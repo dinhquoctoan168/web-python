@@ -21,6 +21,7 @@
             {{end}}
 
             <form action="/login" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <div class="form-group">
                     <label for="username">Tên đăng nhập</label>
                     <input type="text" id="username" name="username" class="form-control" placeholder="Nhập tên đăng nhập" required autofocus autocomplete="username">

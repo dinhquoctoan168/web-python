@@ -27,14 +27,20 @@ func TestExamMonitoring(t *testing.T) {
 	}
 
 	// 3. Ghi nhận các sự kiện vi phạm
-	_ = svc.RecordSessionEvent(session.ID, "tab_hidden", "Rời khỏi tab 12 giây")
-	_ = svc.RecordSessionEvent(session.ID, "tab_hidden", "Rời khỏi tab 5 giây")
-	_ = svc.RecordSessionEvent(session.ID, "window_blur", "Mất tiêu điểm cửa sổ")
-	_ = svc.RecordSessionEvent(session.ID, "paste_attempt", "Dán đoạn code 45 ký tự")
-	_ = svc.RecordSessionEvent(session.ID, "fullscreen_exit", "Thoát chế độ toàn màn hình")
+	_ = svc.RecordSessionEvent(session.ID, session.StudentID, "tab_hidden", "Rời khỏi tab 12 giây")
+	_ = svc.RecordSessionEvent(session.ID, session.StudentID, "tab_hidden", "Rời khỏi tab 5 giây")
+	_ = svc.RecordSessionEvent(session.ID, session.StudentID, "window_blur", "Mất tiêu điểm cửa sổ")
+	_ = svc.RecordSessionEvent(session.ID, session.StudentID, "paste_attempt", "Dán đoạn code 45 ký tự")
+	_ = svc.RecordSessionEvent(session.ID, session.StudentID, "fullscreen_exit", "Thoát chế độ toàn màn hình")
+
+	// Thử gửi sự kiện với student không sở hữu session
+	errUnauthorized := svc.RecordSessionEvent(session.ID, 999, "tab_hidden", "Hack")
+	if errUnauthorized == nil {
+		t.Errorf("Kỳ vọng lỗi khi student 999 gửi sự kiện cho session của student %d", session.StudentID)
+	}
 
 	// Thử gửi sự kiện không hợp lệ
-	errInvalid := svc.RecordSessionEvent(session.ID, "invalid_hack_event", "")
+	errInvalid := svc.RecordSessionEvent(session.ID, session.StudentID, "invalid_hack_event", "")
 	if errInvalid == nil {
 		t.Errorf("Kỳ vọng lỗi khi gửi loại sự kiện không hợp lệ")
 	}

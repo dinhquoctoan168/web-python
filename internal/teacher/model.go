@@ -79,6 +79,7 @@ type StudentExerciseDiagnostic struct {
 type StudentDetailData struct {
 	Title       string                      `json:"title"`
 	User        *auth.User                  `json:"user"`
+	CSRFToken   string                      `json:"csrf_token"`
 	ClassID     int                         `json:"class_id"`
 	ClassName   string                      `json:"class_name"`
 	Student     *auth.User                  `json:"student"`
@@ -87,8 +88,9 @@ type StudentDetailData struct {
 
 // TeacherDashboardPageData dữ liệu trang chính /teacher
 type TeacherDashboardPageData struct {
-	Title   string
-	User    *auth.User
-	Summary TeacherDashboardSummary
-	Classes []ClassSummaryItem
+	Title     string
+	User      *auth.User
+	CSRFToken string
+	Summary   TeacherDashboardSummary
+	Classes   []ClassSummaryItem
 }

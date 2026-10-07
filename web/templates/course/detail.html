@@ -17,7 +17,7 @@
             <a href="/dashboard">&#128202; Dashboard</a>
             <a href="/courses" class="active">&#128218; Môn học</a>
             <a href="/my-assignments">&#128221; Bài tập</a>
-            <a href="/student/exams">&#9201; Kiểm tra</a>
+            <a href="/my-exams">&#9201; Kiểm tra</a>
             <a href="/ide" style="color: var(--nav-accent);">&#9658; Web IDE</a>
             {{ if .User }}
                 {{ if or (eq .User.Role "teacher") (eq .User.Role "admin") }}
@@ -30,6 +30,7 @@
                 <span class="user-name">{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -48,7 +49,7 @@
                 <p class="page-subtitle">{{ .Course.Description }}</p>
             </div>
             <div>
-                <a href="/ide" class="btn btn-success" style="padding: 10px 18px; font-size: 14px;">Mở Web IDE Luyện tập</a>
+                <a href="/ide?mode=practice&course={{ .Course.Code }}" class="btn btn-success" style="padding: 10px 18px; font-size: 14px;">Mở Web IDE Luyện tập</a>
             </div>
         </div>
 
@@ -133,7 +134,7 @@
                 <h3 style="color: var(--text-bright); margin-bottom: 8px;">Kỳ thi & Kiểm tra trực tuyến</h3>
                 <p style="color: var(--text-muted); font-size: 14px;">Tham gia các đợt kiểm tra trực tuyến có giám sát và giới hạn thời gian.</p>
                 <div style="margin-top: 16px;">
-                    <a href="/student/exams" class="btn btn-primary" style="font-size: 13px;">Xem lịch thi của tôi &rarr;</a>
+                    <a href="/my-exams" class="btn btn-primary" style="font-size: 13px;">Xem lịch thi của tôi &rarr;</a>
                 </div>
             </div>
         </div>

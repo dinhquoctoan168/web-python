@@ -163,3 +163,11 @@ func (s *Service) VerifyTeacherOwnership(classID, teacherID int, isAdmin bool) e
 	}
 	return nil
 }
+
+// IsStudentEnrolled kiểm tra sinh viên có trong lớp học hay không
+func (s *Service) IsStudentEnrolled(classID, studentID int) (bool, error) {
+	if classID <= 0 || studentID <= 0 {
+		return false, nil
+	}
+	return s.repo.IsStudentEnrolled(classID, studentID)
+}

@@ -23,6 +23,7 @@
                 <span>{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -87,6 +88,7 @@
             <div class="form-card" style="max-width: 100%;">
                 <h3 style="color: var(--text-bright); margin-bottom: 16px;">+ Thêm chương mới</h3>
                 <form action="/teacher/chapter/create" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <input type="hidden" name="course_id" value="{{ .Curriculum.CourseID }}">
 
                     <div class="form-group">

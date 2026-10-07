@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	"web_python/internal/auth"
+	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 type Handler struct {
@@ -37,10 +39,15 @@ func (h *Handler) HandleStudentDashboard(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "student", "dashboard.html"), data)
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "dashboard.html"), data)
 }
 
-func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
+func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPath string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		frontend.InjectCSRFToMap(r, m)
+	} else if d, ok := data.(*StudentDashboardData); ok {
+		d.CSRFToken = security.GetTokenFromContext(r.Context())
+	}
 	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		http.Error(w, "Lỗi tải giao diện: "+err.Error(), http.StatusInternalServerError)

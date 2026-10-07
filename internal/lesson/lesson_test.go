@@ -123,4 +123,21 @@ func TestLessonAndCurriculum(t *testing.T) {
 	if !updated.IsPublished {
 		t.Errorf("Bài học chưa được cập nhật sang xuất bản")
 	}
+
+	// 8. Kiểm tra VisualizationType nếu bài học có bài tập liên kết
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS exercises (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		lesson_id INTEGER,
+		title TEXT,
+		visualization_type TEXT
+	);`)
+	_, _ = db.Exec(`INSERT INTO exercises (lesson_id, title, visualization_type) VALUES (?, 'Bài tập tìm kiếm', 'binary_search')`, l1.ID)
+
+	vDetail, _, err := service.GetLessonDetail(l1.ID, false)
+	if err != nil {
+		t.Fatalf("GetLessonDetail lỗi: %v", err)
+	}
+	if vDetail.VisualizationType != "binary_search" {
+		t.Errorf("Mong đợi VisualizationType 'binary_search', nhận: '%s'", vDetail.VisualizationType)
+	}
 }

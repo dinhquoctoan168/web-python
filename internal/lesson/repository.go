@@ -162,6 +162,12 @@ func (r *Repository) FindLessonByID(id int) (*Lesson, error) {
 		return nil, fmt.Errorf("truy vấn chi tiết bài học thất bại: %w", err)
 	}
 	l.IsPublished = isPubInt == 1
+
+	// Lấy visualization_type từ bài tập liên kết (nếu bảng exercises tồn tại)
+	var vizType string
+	_ = r.db.QueryRow(`SELECT visualization_type FROM exercises WHERE lesson_id = ? AND visualization_type IS NOT NULL AND visualization_type != '' LIMIT 1`, id).Scan(&vizType)
+	l.VisualizationType = vizType
+
 	return &l, nil
 }
 

@@ -11,7 +11,7 @@
         <a href="/teacher/curriculum" class="{{ if eq .ActiveNav "curriculum" }}active{{ end }}">&#128214; Nội dung</a>
         <a href="/ide" class="{{ if eq .ActiveNav "exercises" }}active{{ end }}">&#128187; Ngân hàng bài tập</a>
         <a href="/teacher/assignments" class="{{ if eq .ActiveNav "assignments" }}active{{ end }}">&#128221; Bài tập</a>
-        <a href="/teacher/exam/monitoring" class="{{ if eq .ActiveNav "exams" }}active{{ end }}">&#9201; Kiểm tra</a>
+        <a href="/teacher/exams" class="{{ if eq .ActiveNav "exams" }}active{{ end }}">&#9201; Kiểm tra</a>
         <a href="/teacher/classes" class="{{ if eq .ActiveNav "students" }}active{{ end }}">&#128101; Sinh viên</a>
         <a href="/teacher" class="{{ if eq .ActiveNav "analytics" }}active{{ end }}">&#128200; Thống kê</a>
     </nav>
@@ -20,6 +20,7 @@
             <span class="user-name">{{ .User.FullName }}</span>
             <span class="badge-role teacher">{{ .User.Role }}</span>
             <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
             </form>
         {{ end }}

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"web_python/internal/auth"
+	"web_python/internal/frontend"
 )
 
 // Handler xử lý các yêu cầu HTTP liên quan đến chương mục và bài học
@@ -38,7 +39,7 @@ func (h *Handler) HandleStudentLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "course", "lesson.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "course", "lesson.html"), map[string]any{
 		"Title":      lesson.Title + " - " + lesson.CourseName,
 		"Lesson":     lesson,
 		"Curriculum": curriculum,
@@ -74,9 +75,14 @@ func (h *Handler) HandleAPICourseCurriculum(w http.ResponseWriter, r *http.Reque
 // HandleTeacherCurriculum quản lý danh sách chương và bài học của môn (GET /teacher/curriculum?course_id=)
 func (h *Handler) HandleTeacherCurriculum(w http.ResponseWriter, r *http.Request) {
 	courseIDStr := r.URL.Query().Get("course_id")
+	if courseIDStr == "" {
+		http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
+		return
+	}
+
 	courseID, err := strconv.Atoi(courseIDStr)
 	if err != nil || courseID <= 0 {
-		http.Error(w, "ID môn học không hợp lệ", http.StatusBadRequest)
+		http.Redirect(w, r, "/teacher/courses", http.StatusSeeOther)
 		return
 	}
 
@@ -87,7 +93,7 @@ func (h *Handler) HandleTeacherCurriculum(w http.ResponseWriter, r *http.Request
 	}
 
 	user := auth.GetUser(r.Context())
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "curriculum.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "curriculum.html"), map[string]any{
 		"Title":      "Quản lý Nội dung: " + curriculum.CourseName,
 		"Curriculum": curriculum,
 		"User":       user,
@@ -135,7 +141,7 @@ func (h *Handler) HandleTeacherNewLessonForm(w http.ResponseWriter, r *http.Requ
 	}
 
 	user := auth.GetUser(r.Context())
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "lesson_form.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "lesson_form.html"), map[string]any{
 		"Title":   "Thêm bài học mới",
 		"IsNew":   true,
 		"Chapter": chapter,
@@ -197,7 +203,7 @@ func (h *Handler) HandleTeacherEditLessonForm(w http.ResponseWriter, r *http.Req
 	}
 
 	user := auth.GetUser(r.Context())
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "lesson_form.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "lesson_form.html"), map[string]any{
 		"Title":   "Chỉnh sửa bài học: " + lesson.Title,
 		"IsNew":   false,
 		"Lesson":  lesson,
@@ -244,7 +250,10 @@ func (h *Handler) HandleTeacherUpdateLesson(w http.ResponseWriter, r *http.Reque
 	http.Redirect(w, r, "/teacher/curriculum?course_id="+strconv.Itoa(courseID), http.StatusSeeOther)
 }
 
-func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
+func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPath string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		frontend.InjectCSRFToMap(r, m)
+	}
 	tmpl, err := template.ParseFiles(tmplPath)
 	if err != nil {
 		http.Error(w, "Không tìm thấy giao diện: "+err.Error(), http.StatusInternalServerError)

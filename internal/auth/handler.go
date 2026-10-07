@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"web_python/internal/audit"
+	"web_python/internal/security"
 )
 
 // Handler xử lý các yêu cầu HTTP liên quan đến Authentication
@@ -35,7 +36,7 @@ func (h *Handler) ShowLoginPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderLoginTemplate(w, "")
+	h.renderLoginTemplate(w, r, "")
 }
 
 // HandleLogin xử lý form đăng nhập
@@ -46,7 +47,7 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := r.ParseForm(); err != nil {
-		h.renderLoginTemplate(w, "Dữ liệu gửi lên không hợp lệ")
+		h.renderLoginTemplate(w, r, "Dữ liệu gửi lên không hợp lệ")
 		return
 	}
 
@@ -54,14 +55,14 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	if username == "" || password == "" {
-		h.renderLoginTemplate(w, "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu")
+		h.renderLoginTemplate(w, r, "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu")
 		return
 	}
 
 	user, session, err := h.service.Authenticate(username, password)
 	if err != nil {
 		audit.LogLoginFailure(username, r.RemoteAddr, err.Error())
-		h.renderLoginTemplate(w, err.Error())
+		h.renderLoginTemplate(w, r, err.Error())
 		return
 	}
 
@@ -126,7 +127,7 @@ func (h *Handler) HandleCurrentUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) renderLoginTemplate(w http.ResponseWriter, errorMsg string) {
+func (h *Handler) renderLoginTemplate(w http.ResponseWriter, r *http.Request, errorMsg string) {
 	tmplPath := h.tmplPattern
 	if tmplPath == "" {
 		tmplPath = filepath.Join("web", "templates", "login.html")
@@ -139,9 +140,11 @@ func (h *Handler) renderLoginTemplate(w http.ResponseWriter, errorMsg string) {
 	}
 
 	data := struct {
-		Error string
+		Error     string
+		CSRFToken string
 	}{
-		Error: errorMsg,
+		Error:     errorMsg,
+		CSRFToken: security.GetTokenFromContext(r.Context()),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

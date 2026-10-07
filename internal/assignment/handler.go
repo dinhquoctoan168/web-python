@@ -10,6 +10,7 @@ import (
 	"web_python/internal/auth"
 	"web_python/internal/class"
 	"web_python/internal/exercise"
+	"web_python/internal/frontend"
 )
 
 type Handler struct {
@@ -40,7 +41,7 @@ func (h *Handler) HandleTeacherListAssignments(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "assignment_list.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "assignment_list.html"), map[string]any{
 		"Title":       "Quản lý Bài tập",
 		"Assignments": assignments,
 		"User":        user,
@@ -67,7 +68,7 @@ func (h *Handler) HandleTeacherNewAssignmentForm(w http.ResponseWriter, r *http.
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "assignment_form.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "assignment_form.html"), map[string]any{
 		"Title":     "Giao bài tập mới",
 		"Classes":   classes,
 		"Exercises": exercises,
@@ -130,6 +131,11 @@ func (h *Handler) HandleTeacherCreateAssignment(w http.ResponseWriter, r *http.R
 // HandleTeacherAssignmentDetail xem chi tiết đợt bài tập
 func (h *Handler) HandleTeacherAssignmentDetail(w http.ResponseWriter, r *http.Request) {
 	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id <= 0 {
 		http.Error(w, "ID bài tập không hợp lệ", http.StatusBadRequest)
@@ -137,12 +143,17 @@ func (h *Handler) HandleTeacherAssignmentDetail(w http.ResponseWriter, r *http.R
 	}
 
 	a, err := h.assignmentService.GetAssignment(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	if err != nil || a == nil {
+		http.Error(w, "Không tìm thấy bài tập", http.StatusNotFound)
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "teacher", "assignment_detail.html"), map[string]any{
+	if user.Role != auth.RoleAdmin && a.CreatedBy != user.ID {
+		http.Error(w, "Bạn không có quyền quản lý bài tập này", http.StatusForbidden)
+		return
+	}
+
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "assignment_detail.html"), map[string]any{
 		"Title":      a.Title,
 		"Assignment": a,
 		"User":       user,
@@ -156,9 +167,26 @@ func (h *Handler) HandleTeacherPublishAssignment(w http.ResponseWriter, r *http.
 		return
 	}
 
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil || id <= 0 {
 		http.Error(w, "ID bài tập không hợp lệ", http.StatusBadRequest)
+		return
+	}
+
+	a, err := h.assignmentService.GetAssignment(id)
+	if err != nil || a == nil {
+		http.Error(w, "Không tìm thấy bài tập", http.StatusNotFound)
+		return
+	}
+
+	if user.Role != auth.RoleAdmin && a.CreatedBy != user.ID {
+		http.Error(w, "Bạn không có quyền công bố bài tập này", http.StatusForbidden)
 		return
 	}
 
@@ -169,6 +197,47 @@ func (h *Handler) HandleTeacherPublishAssignment(w http.ResponseWriter, r *http.
 
 	http.Redirect(w, r, "/teacher/assignment?id="+strconv.Itoa(id), http.StatusSeeOther)
 }
+
+// HandleStudentAssignmentDetail xem chi tiết bài tập được giao cho sinh viên
+func (h *Handler) HandleStudentAssignmentDetail(w http.ResponseWriter, r *http.Request) {
+	user := auth.GetUser(r.Context())
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || id <= 0 {
+		http.Redirect(w, r, "/my-assignments", http.StatusSeeOther)
+		return
+	}
+
+	a, err := h.assignmentService.GetAssignment(id)
+	if err != nil || a == nil {
+		http.Error(w, "Không tìm thấy bài tập", http.StatusNotFound)
+		return
+	}
+
+	if user.Role == auth.RoleStudent && a.Status != StatusPublished {
+		http.Error(w, "Bài tập chưa được công bố", http.StatusForbidden)
+		return
+	}
+
+	if user.Role == auth.RoleStudent && h.classService != nil {
+		enrolled, err := h.classService.IsStudentEnrolled(a.ClassID, user.ID)
+		if err != nil || !enrolled {
+			http.Error(w, "Bạn không thuộc lớp học được giao bài tập này", http.StatusForbidden)
+			return
+		}
+	}
+
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "assignment_detail.html"), map[string]any{
+		"Title":      a.Title,
+		"Assignment": a,
+		"User":       user,
+	})
+}
+
 
 // HandleStudentMyAssignments danh sách bài tập được giao cho học viên
 func (h *Handler) HandleStudentMyAssignments(w http.ResponseWriter, r *http.Request) {
@@ -184,14 +253,17 @@ func (h *Handler) HandleStudentMyAssignments(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	h.renderTemplate(w, filepath.Join("web", "templates", "student", "assignment_list.html"), map[string]any{
+	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "assignment_list.html"), map[string]any{
 		"Title":       "Bài tập được giao",
 		"Assignments": assignments,
 		"User":        user,
 	})
 }
 
-func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data any) {
+func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPath string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		frontend.InjectCSRFToMap(r, m)
+	}
 	funcMap := template.FuncMap{
 		"formatDate": func(t any) string {
 			if t == nil {
@@ -200,7 +272,8 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, tmplPath string, data an
 			return ""
 		},
 	}
-	tmpl, err := template.New(filepath.Base(tmplPath)).Funcs(funcMap).ParseFiles(tmplPath)
+	resolvedPath := frontend.ResolveTemplatePath(tmplPath)
+	tmpl, err := template.New(filepath.Base(resolvedPath)).Funcs(funcMap).ParseFiles(resolvedPath)
 	if err != nil {
 		http.Error(w, "Lỗi nạp giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

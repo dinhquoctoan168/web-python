@@ -1,11 +1,8 @@
 package judge
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -20,20 +17,14 @@ var (
 
 type Service struct {
 	exerciseService *exercise.Service
-	pythonPath      string
 	defaultTimeout  time.Duration
 }
 
 func NewService(es *exercise.Service) *Service {
 	return &Service{
 		exerciseService: es,
-		pythonPath:      "python3",
 		defaultTimeout:  3 * time.Second,
 	}
-}
-
-func (s *Service) SetPythonPath(path string) {
-	s.pythonPath = path
 }
 
 func (s *Service) SetDefaultTimeout(d time.Duration) {
@@ -123,9 +114,7 @@ func (s *Service) Evaluate(req JudgeRequest) (*JudgeResult, error) {
 		}
 		totalWeight += w
 
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		res := s.runTestCase(ctx, code, tc)
-		cancel()
+		res := s.runTestCase(timeout, code, tc)
 
 		if res.Passed {
 			passedWeight += w
@@ -176,8 +165,7 @@ func (s *Service) Evaluate(req JudgeRequest) (*JudgeResult, error) {
 	}, nil
 }
 
-func (s *Service) runTestCase(ctx context.Context, sourceCode string, tc exercise.TestCase) TestResult {
-	start := time.Now()
+func (s *Service) runTestCase(timeout time.Duration, sourceCode string, tc exercise.TestCase) TestResult {
 	res := TestResult{
 		TestCaseID: tc.ID,
 		OrderNum:   tc.OrderNum,
@@ -192,46 +180,29 @@ func (s *Service) runTestCase(ctx context.Context, sourceCode string, tc exercis
 	script.WriteString(sourceCode)
 	script.WriteString("\n\n")
 
-	var stdinInput string
 	if tc.CallExpression != "" {
 		script.WriteString("if __name__ == '__main__':\n")
 		script.WriteString(fmt.Sprintf("    __res__ = %s\n", tc.CallExpression))
 		script.WriteString("    print(__res__)\n")
-	} else if tc.InputData != "" {
-		stdinInput = tc.InputData
 	}
 
-	cmd := exec.CommandContext(ctx, s.pythonPath, "-c", script.String())
-	if stdinInput != "" {
-		cmd.Stdin = strings.NewReader(stdinInput)
-	}
+	execRes := ExecutePythonWithSkulpt(script.String(), tc.InputData, timeout)
+	res.RuntimeMS = execRes.RuntimeMS
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
-
-	err := cmd.Run()
-	duration := time.Since(start).Milliseconds()
-	res.RuntimeMS = duration
-
-	if ctx.Err() == context.DeadlineExceeded {
+	if execRes.TimedOut {
 		res.Passed = false
 		res.Error = "Quá thời gian thực thi (Time Limit Exceeded)"
 		return res
 	}
 
-	if err != nil {
+	if execRes.Error != "" {
 		res.Passed = false
-		errMsg := strings.TrimSpace(stderrBuf.String())
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
-		res.Error = errMsg
-		res.Actual = strings.TrimSpace(stdoutBuf.String())
+		res.Error = execRes.Error
+		res.Actual = execRes.Output
 		return res
 	}
 
-	actual := strings.TrimSpace(stdoutBuf.String())
+	actual := execRes.Output
 	res.Actual = actual
 
 	if normalizeValue(tc.ExpectedOutput) == normalizeValue(actual) {
@@ -244,7 +215,6 @@ func (s *Service) runTestCase(ctx context.Context, sourceCode string, tc exercis
 }
 
 func (s *Service) runSimpleScript(sourceCode string) TestResult {
-	start := time.Now()
 	res := TestResult{
 		OrderNum:  1,
 		IsHidden:  false,
@@ -252,31 +222,24 @@ func (s *Service) runSimpleScript(sourceCode string) TestResult {
 		RuntimeMS: 0,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.defaultTimeout)
-	defer cancel()
+	execRes := ExecutePythonWithSkulpt(sourceCode, "", s.defaultTimeout)
+	res.RuntimeMS = execRes.RuntimeMS
 
-	cmd := exec.CommandContext(ctx, s.pythonPath, "-c", sourceCode)
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
-
-	err := cmd.Run()
-	res.RuntimeMS = time.Since(start).Milliseconds()
-
-	if ctx.Err() == context.DeadlineExceeded {
+	if execRes.TimedOut {
 		res.Passed = false
-		res.Error = "Quá thời gian thực thi"
+		res.Error = "Quá thời gian thực thi (Time Limit Exceeded)"
 		return res
 	}
 
-	if err != nil {
+	if execRes.Error != "" {
 		res.Passed = false
-		res.Error = strings.TrimSpace(stderrBuf.String())
+		res.Error = execRes.Error
+		res.Actual = execRes.Output
 		return res
 	}
 
 	res.Passed = true
-	res.Actual = strings.TrimSpace(stdoutBuf.String())
+	res.Actual = execRes.Output
 	return res
 }
 

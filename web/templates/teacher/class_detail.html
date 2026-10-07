@@ -23,6 +23,7 @@
                 <span>{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -65,6 +66,7 @@
         <div class="form-card" style="max-width: 100%; margin-bottom: 24px;">
             <h3 style="color: var(--text-bright); margin-bottom: 12px; font-size: 16px;">Ghi danh sinh viên vào lớp</h3>
             <form action="/teacher/class/enroll" method="POST" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 <input type="hidden" name="class_id" value="{{ .Class.ID }}">
                 <input type="text" name="username" class="form-control" placeholder="Nhập tên đăng nhập sinh viên (ví dụ: student)" required style="max-width: 350px;">
                 <button type="submit" class="btn btn-primary" style="padding: 10px 16px;">+ Thêm sinh viên</button>
@@ -94,6 +96,7 @@
                         <td>{{ $s.EnrolledAt.Format "02/01/2006 15:04" }}</td>
                         <td>
                             <form action="/teacher/class/remove-student" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa sinh viên này khỏi lớp?');" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
                                 <input type="hidden" name="class_id" value="{{ $.Class.ID }}">
                                 <input type="hidden" name="student_id" value="{{ $s.ID }}">
                                 <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; color: #ff8888;">Xóa</button>

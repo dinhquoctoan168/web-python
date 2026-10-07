@@ -22,6 +22,7 @@
                 <span>{{ .User.FullName }}</span>
                 <span class="badge-role">{{ .User.Role }}</span>
                 <form action="/logout" method="POST" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                     <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
                 </form>
             {{ end }}
@@ -47,6 +48,7 @@
 
         <div class="form-card">
             <form action="{{ if .IsNew }}/teacher/course/create{{ else }}/teacher/course/update{{ end }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
                 {{ if not .IsNew }}
                 <input type="hidden" name="id" value="{{ .Course.ID }}">
                 {{ end }}

@@ -37,6 +37,7 @@ type RecentSubmissionItem struct {
 type StudentDashboardData struct {
 	Title             string
 	User              *auth.User
+	CSRFToken         string
 	Courses           []CourseProgressItem
 	Upcoming          []UpcomingItem
 	RecentSubmissions []RecentSubmissionItem

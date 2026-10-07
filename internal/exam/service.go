@@ -189,10 +189,13 @@ func (s *Service) StartOrResumeSession(examID, studentID int) (*ExamSession, *Ex
 }
 
 // SaveAnswerDraft lưu tạm code câu trả lời trong quá trình làm bài thi
-func (s *Service) SaveAnswerDraft(sessionID, exerciseID int, sourceCode string) error {
+func (s *Service) SaveAnswerDraft(sessionID, studentID, exerciseID int, sourceCode string) error {
 	session, err := s.repo.GetSession(sessionID)
 	if err != nil || session == nil {
 		return errors.New("phiên thi không hợp lệ")
+	}
+	if session.StudentID != studentID {
+		return errors.New("không có quyền truy cập phiên thi này")
 	}
 	if session.Status != SessionInProgress {
 		return ErrSessionClosed
@@ -213,10 +216,13 @@ func (s *Service) SaveAnswerDraft(sessionID, exerciseID int, sourceCode string) 
 }
 
 // SubmitExam hoàn thành bài thi và chấm điểm tổng kết
-func (s *Service) SubmitExam(sessionID int) (float64, error) {
+func (s *Service) SubmitExam(sessionID, studentID int) (float64, error) {
 	session, err := s.repo.GetSession(sessionID)
 	if err != nil || session == nil {
 		return 0, errors.New("phiên thi không tồn tại")
+	}
+	if session.StudentID != studentID {
+		return 0, errors.New("không có quyền truy cập phiên thi này")
 	}
 	if session.Status == SessionSubmitted {
 		return session.FinalScore, nil
@@ -277,9 +283,17 @@ func (s *Service) SubmitExam(sessionID int) (float64, error) {
 }
 
 // RecordSessionEvent ghi nhận một sự kiện bất thường từ phòng thi của thí sinh
-func (s *Service) RecordSessionEvent(sessionID int, eventType, eventData string) error {
+func (s *Service) RecordSessionEvent(sessionID, studentID int, eventType, eventData string) error {
 	if sessionID <= 0 {
 		return errors.New("phiên thi không hợp lệ")
+	}
+
+	session, err := s.repo.GetSession(sessionID)
+	if err != nil || session == nil {
+		return errors.New("phiên thi không hợp lệ")
+	}
+	if session.StudentID != studentID {
+		return errors.New("không có quyền truy cập phiên thi này")
 	}
 
 	validEvents := map[string]bool{
