@@ -547,6 +547,99 @@ var migrations = []Migration{
 			return err
 		},
 	},
+	{
+		Version: 15,
+		Name:    "migrate_topics_to_chapters",
+		Up: func(tx *sql.Tx) error {
+			// 1. Kiểm tra xem có topics nào không. Nếu không có topic nào thì không cần migrate
+			var topicCount int
+			err := tx.QueryRow(`SELECT COUNT(*) FROM topics`).Scan(&topicCount)
+			if err != nil || topicCount == 0 {
+				return nil
+			}
+
+			// 2. Tìm hoặc tạo course DSA301
+			var dsaCourseID int
+			err = tx.QueryRow(`SELECT id FROM courses WHERE code = 'DSA301' LIMIT 1`).Scan(&dsaCourseID)
+			if err == sql.ErrNoRows {
+				res, err := tx.Exec(`INSERT INTO courses (id, code, name, description, status) 
+					VALUES (3, 'DSA301', 'Cấu trúc dữ liệu và giải thuật', 'Học phần CSDL & Giải thuật', 'active')`)
+				if err != nil {
+					res, err = tx.Exec(`INSERT INTO courses (code, name, description, status) 
+						VALUES ('DSA301', 'Cấu trúc dữ liệu và giải thuật', 'Học phần CSDL & Giải thuật', 'active')`)
+					if err != nil {
+						return err
+					}
+				}
+				id, _ := res.LastInsertId()
+				dsaCourseID = int(id)
+			} else if err != nil {
+				return err
+			}
+
+			// 2. Đọc tất cả topics hiện có
+			type topicRow struct {
+				id       int
+				name     string
+				desc     string
+				orderNum int
+			}
+			rows, err := tx.Query(`SELECT id, name, COALESCE(description, ''), order_num FROM topics ORDER BY order_num ASC, id ASC`)
+			if err != nil {
+				return nil
+			}
+			var topicList []topicRow
+			for rows.Next() {
+				var tr topicRow
+				if err := rows.Scan(&tr.id, &tr.name, &tr.desc, &tr.orderNum); err == nil {
+					topicList = append(topicList, tr)
+				}
+			}
+			rows.Close()
+
+			// 3. Chuyển đổi topics thành chapters và liên kết exercises.lesson_id
+			for _, tr := range topicList {
+				var chapID int
+				err := tx.QueryRow(`SELECT id FROM chapters WHERE course_id = ? AND title = ?`, dsaCourseID, tr.name).Scan(&chapID)
+				if err == sql.ErrNoRows {
+					res, err := tx.Exec(`INSERT INTO chapters (course_id, title, description, order_num) VALUES (?, ?, ?, ?)`,
+						dsaCourseID, tr.name, tr.desc, tr.orderNum)
+					if err != nil {
+						return err
+					}
+					cid, _ := res.LastInsertId()
+					chapID = int(cid)
+				} else if err != nil {
+					return err
+				}
+
+				// Tạo lesson mặc định trong chapter nếu chưa có
+				var lesID int
+				err = tx.QueryRow(`SELECT id FROM lessons WHERE chapter_id = ? LIMIT 1`, chapID).Scan(&lesID)
+				if err == sql.ErrNoRows {
+					lesTitle := "Lý thuyết & Bài tập " + tr.name
+					contentHTML := fmt.Sprintf("<p>Tổng hợp lý thuyết và các bài tập thực hành cho chủ đề %s.</p>", tr.name)
+					res, err := tx.Exec(`INSERT INTO lessons (chapter_id, title, content_html, order_num, is_published) VALUES (?, ?, ?, 1, 1)`,
+						chapID, lesTitle, contentHTML)
+					if err != nil {
+						return err
+					}
+					lid, _ := res.LastInsertId()
+					lesID = int(lid)
+				} else if err != nil {
+					return err
+				}
+
+				// Cập nhật exercises cũ thuộc topic này
+				_, err = tx.Exec(`UPDATE exercises SET lesson_id = ?, course_id = ? WHERE topic_id = ? AND (lesson_id IS NULL OR lesson_id = 0)`,
+					lesID, dsaCourseID, tr.id)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng
