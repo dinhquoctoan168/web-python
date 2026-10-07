@@ -58,6 +58,48 @@
             <!-- Tab 1: Danh sách bài tập -->
             <div class="tab-content active" id="tab-exercises">
                 <div class="topic-list">
+                    {{ if .Chapters }}
+                    {{ range .Chapters }}
+                    <div class="topic-group">
+                        <div class="topic-title">
+                            <span class="topic-name">{{ .Title }}</span>
+                            <span class="topic-count">{{ len .Exercises }} bài</span>
+                        </div>
+                        <ul class="exercise-items">
+                            {{ range .Exercises }}
+                            <li class="exercise-item {{ if $.CurrentExercise }}{{ if eq $.CurrentExercise.ID .ID }}active{{ end }}{{ end }}" 
+                                data-id="{{ .ID }}" 
+                                id="exercise-item-{{ .ID }}">
+                                <div class="exercise-item-header" onclick="loadExercise({{ .ID }})">
+                                    <span class="ex-bullet status-notstarted" id="exBullet-{{ .ID }}" title="Chưa làm">&#9675;</span>
+                                    <span class="ex-name">{{ .Title }}</span>
+                                    <span class="badge-mini badge-{{ .Difficulty }}">{{ .Difficulty }}</span>
+                                    <button class="btn-toggle-problem" type="button" title="Ẩn / Hiện đề bài" onclick="toggleProblemDrawer(event, {{ .ID }})">
+                                        <span class="toggle-text">Ẩn đề</span>
+                                    </button>
+                                </div>
+                                <div class="inline-problem-panel" id="inlineProblem-{{ .ID }}">
+                                    {{ if $.CurrentExercise }}{{ if eq $.CurrentExercise.ID .ID }}
+                                    <div class="inline-problem-desc">{{ .Description }}</div>
+                                    {{ if .AllowedFunctions }}
+                                    <div class="inline-section-title">Hàm cho phép:</div>
+                                    <div class="chip-container">
+                                        {{ range .AllowedFunctions }}
+                                        <span class="func-chip">{{ . }}()</span>
+                                        {{ end }}
+                                    </div>
+                                    {{ end }}
+                                    {{ if .SolutionHint }}
+                                    <div class="inline-hint-box"><strong>Gợi ý:</strong> {{ .SolutionHint }}</div>
+                                    {{ end }}
+                                    {{ end }}{{ end }}
+                                </div>
+                            </li>
+                            {{ end }}
+                        </ul>
+                    </div>
+                    {{ end }}
+                    {{ else }}
                     {{ range .Topics }}
                     <div class="topic-group">
                         <div class="topic-title">
@@ -97,6 +139,7 @@
                             {{ end }}
                         </ul>
                     </div>
+                    {{ end }}
                     {{ end }}
                 </div>
             </div>

@@ -35,6 +35,16 @@ type Topic struct {
 	Exercises   []Exercise `json:"exercises"`
 }
 
+// ChapterItem đại diện cho một chương học kèm các bài tập thuộc chương đó (Phase 24)
+type ChapterItem struct {
+	ID          int        `json:"id"`
+	CourseID    int        `json:"course_id"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	OrderNum    int        `json:"order_num"`
+	Exercises   []Exercise `json:"exercises"`
+}
+
 // FunctionItem đại diện cho thông tin 1 hàm tra cứu
 type FunctionItem struct {
 	ID          int    `json:"id"`
@@ -45,9 +55,124 @@ type FunctionItem struct {
 	Example     string `json:"example"`
 }
 
+// GetCourseStructure lấy cấu trúc môn học gồm các chương và bài tập (thay thế GetTopicsWithExercises theo Phase 24)
+func GetCourseStructure(courseCode string) ([]ChapterItem, error) {
+	db := database.GetDB()
+	if db == nil {
+		return nil, nil
+	}
+
+	courseCode = strings.TrimSpace(courseCode)
+	if courseCode == "" {
+		courseCode = "DSA301"
+	}
+
+	var courseID int
+	err := db.QueryRow(`SELECT id FROM courses WHERE code = ? LIMIT 1`, courseCode).Scan(&courseID)
+	if err != nil {
+		_ = db.QueryRow(`SELECT id FROM courses ORDER BY id ASC LIMIT 1`).Scan(&courseID)
+	}
+
+	if courseID == 0 {
+		return nil, nil
+	}
+
+	cRows, err := db.Query(`SELECT id, course_id, title, COALESCE(description, ''), order_num 
+		FROM chapters WHERE course_id = ? ORDER BY order_num ASC, id ASC`, courseID)
+	if err != nil {
+		return nil, err
+	}
+	defer cRows.Close()
+
+	var chapters []ChapterItem
+	for cRows.Next() {
+		var c ChapterItem
+		if err := cRows.Scan(&c.ID, &c.CourseID, &c.Title, &c.Description, &c.OrderNum); err == nil {
+			chapters = append(chapters, c)
+		}
+	}
+
+	for i := range chapters {
+		chapID := chapters[i].ID
+		exRows, err := db.Query(`SELECT e.id, COALESCE(e.topic_id, 0), e.title, e.difficulty, e.description, 
+			e.initial_code, COALESCE(e.allowed_functions, '[]'), COALESCE(e.solution_hint, ''), COALESCE(e.visualization_type, '')
+			FROM exercises e
+			LEFT JOIN lessons l ON e.lesson_id = l.id
+			WHERE l.chapter_id = ? OR (e.course_id = ? AND e.lesson_id IS NULL)
+			ORDER BY e.id ASC`, chapID, courseID)
+		if err != nil {
+			continue
+		}
+
+		var exList []Exercise
+		for exRows.Next() {
+			var ex Exercise
+			var allowedFuncsRaw string
+			if err := exRows.Scan(&ex.ID, &ex.TopicID, &ex.Title, &ex.Difficulty, &ex.Description, &ex.InitialCode, &allowedFuncsRaw, &ex.SolutionHint, &ex.VisualizationType); err == nil {
+				_ = json.Unmarshal([]byte(allowedFuncsRaw), &ex.AllowedFunctions)
+
+				// Lấy public test cases
+				tcRows, tcErr := db.Query(`SELECT input_data, call_expression, expected_output 
+					FROM exercise_test_cases WHERE exercise_id = ? AND is_hidden = 0 ORDER BY order_num ASC, id ASC`, ex.ID)
+				if tcErr == nil {
+					type clientTC struct {
+						Call     string `json:"call"`
+						Input    string `json:"input"`
+						Expected string `json:"expected"`
+					}
+					var tcs []clientTC
+					for tcRows.Next() {
+						var inp, call, exp string
+						if err := tcRows.Scan(&inp, &call, &exp); err == nil {
+							tcs = append(tcs, clientTC{Call: call, Input: inp, Expected: exp})
+						}
+					}
+					tcRows.Close()
+					tcBytes, _ := json.Marshal(tcs)
+					ex.TestCasesJSON = string(tcBytes)
+				} else {
+					ex.TestCasesJSON = "[]"
+				}
+
+				exList = append(exList, ex)
+			}
+		}
+		exRows.Close()
+		chapters[i].Exercises = exList
+	}
+
+	return chapters, nil
+}
+
 // GetTopicsWithExercises lấy toàn bộ chủ đề kèm danh sách bài tập tương ứng
+// Deprecated: Đã thay thế bằng GetCourseStructure theo Phase 24. Hàm này được giữ lại để tương thích ngược.
 func GetTopicsWithExercises() ([]Topic, error) {
 	db := database.GetDB()
+	if db == nil {
+		return nil, nil
+	}
+
+	var topicCount int
+	_ = db.QueryRow("SELECT COUNT(*) FROM topics").Scan(&topicCount)
+	if topicCount == 0 {
+		// Tự động chuyển tiếp sang cấu trúc chapters mới nếu bảng topics không có dữ liệu
+		chaps, err := GetCourseStructure("DSA301")
+		if err != nil {
+			return nil, err
+		}
+		var topics []Topic
+		for _, c := range chaps {
+			topics = append(topics, Topic{
+				ID:          c.ID,
+				Name:        c.Title,
+				Description: c.Description,
+				OrderNum:    c.OrderNum,
+				Exercises:   c.Exercises,
+			})
+		}
+		return topics, nil
+	}
+
 	rows, err := db.Query("SELECT id, name, description, icon, order_num FROM topics ORDER BY order_num ASC")
 	if err != nil {
 		return nil, err
@@ -78,10 +203,8 @@ func GetTopicsWithExercises() ([]Topic, error) {
 				exRows.Close()
 				return nil, err
 			}
-			// Parse JSON danh sách hàm cho phép
 			_ = json.Unmarshal([]byte(allowedFuncsRaw), &ex.AllowedFunctions)
 
-			// Lấy public test cases (is_hidden = 0)
 			tcRows, tcErr := db.Query(`SELECT input_data, call_expression, expected_output 
 				FROM exercise_test_cases WHERE exercise_id = ? AND is_hidden = 0 ORDER BY order_num ASC, id ASC`, ex.ID)
 			if tcErr == nil {

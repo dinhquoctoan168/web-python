@@ -15,7 +15,9 @@ import (
 // IDEPageData chứa dữ liệu truyền vào template HTML của IDE
 type IDEPageData struct {
 	Title           string
-	Topics          []logic.Topic
+	CourseCode      string
+	Chapters        []logic.ChapterItem
+	Topics          []logic.Topic // Tương thích ngược với các template cũ
 	CurrentExercise *logic.Exercise
 	Functions       []logic.FunctionItem
 }
@@ -27,12 +29,18 @@ func HandleIDE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	topics, err := logic.GetTopicsWithExercises()
-	if err != nil {
-		log.Printf("Lỗi lấy danh sách topics: %v", err)
-		http.Error(w, "Lỗi nạp dữ liệu", http.StatusInternalServerError)
-		return
+	courseCode := r.URL.Query().Get("course")
+	if courseCode == "" {
+		courseCode = "DSA301"
 	}
+
+	chapters, err := logic.GetCourseStructure(courseCode)
+	if err != nil {
+		log.Printf("Lỗi lấy cấu trúc môn học %s: %v", courseCode, err)
+	}
+
+	// Đọc danh sách topics cũ hoặc adapter
+	topics, _ := logic.GetTopicsWithExercises()
 
 	// Xác định bài tập hiện tại
 	var currentExercise *logic.Exercise
@@ -44,9 +52,14 @@ func HandleIDE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Mặc định chọn bài đầu tiên nếu chưa chọn
-	if currentExercise == nil && len(topics) > 0 && len(topics[0].Exercises) > 0 {
-		firstID := topics[0].Exercises[0].ID
-		currentExercise, _ = logic.GetExerciseByID(firstID)
+	if currentExercise == nil {
+		if len(chapters) > 0 && len(chapters[0].Exercises) > 0 {
+			firstID := chapters[0].Exercises[0].ID
+			currentExercise, _ = logic.GetExerciseByID(firstID)
+		} else if len(topics) > 0 && len(topics[0].Exercises) > 0 {
+			firstID := topics[0].Exercises[0].ID
+			currentExercise, _ = logic.GetExerciseByID(firstID)
+		}
 	}
 
 	funcs, err := logic.SearchFunctions("")
@@ -56,6 +69,8 @@ func HandleIDE(w http.ResponseWriter, r *http.Request) {
 
 	data := IDEPageData{
 		Title:           "Web Python IDE - CSDL & Giải thuật",
+		CourseCode:      courseCode,
+		Chapters:        chapters,
 		Topics:          topics,
 		CurrentExercise: currentExercise,
 		Functions:       funcs,
