@@ -109,7 +109,7 @@ func (r *Repository) CreateChapter(c *Chapter) error {
 func (r *Repository) ListLessonsByChapter(chapterID int, onlyPublished bool) ([]Lesson, error) {
 	query := `
 		SELECT l.id, l.chapter_id, ch.title, ch.course_id, c.code, c.name,
-		       l.title, COALESCE(l.content_html, ''), l.order_num, l.is_published, l.created_at
+		       l.title, COALESCE(l.content_html, ''), COALESCE(l.visualization_type, ''), COALESCE(l.visualization_config, ''), l.order_num, l.is_published, l.created_at
 		FROM lessons l
 		JOIN chapters ch ON l.chapter_id = ch.id
 		JOIN courses c ON ch.course_id = c.id
@@ -131,7 +131,7 @@ func (r *Repository) ListLessonsByChapter(chapterID int, onlyPublished bool) ([]
 		var l Lesson
 		var isPubInt int
 		if err := rows.Scan(&l.ID, &l.ChapterID, &l.ChapterTitle, &l.CourseID, &l.CourseCode, &l.CourseName,
-			&l.Title, &l.ContentHTML, &l.OrderNum, &isPubInt, &l.CreatedAt); err != nil {
+			&l.Title, &l.ContentHTML, &l.VisualizationType, &l.VisualizationConfig, &l.OrderNum, &isPubInt, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		l.IsPublished = isPubInt == 1
@@ -144,7 +144,7 @@ func (r *Repository) ListLessonsByChapter(chapterID int, onlyPublished bool) ([]
 func (r *Repository) FindLessonByID(id int) (*Lesson, error) {
 	row := r.db.QueryRow(`
 		SELECT l.id, l.chapter_id, ch.title, ch.course_id, c.code, c.name,
-		       l.title, COALESCE(l.content_html, ''), l.order_num, l.is_published, l.created_at
+		       l.title, COALESCE(l.content_html, ''), COALESCE(l.visualization_type, ''), COALESCE(l.visualization_config, ''), l.order_num, l.is_published, l.created_at
 		FROM lessons l
 		JOIN chapters ch ON l.chapter_id = ch.id
 		JOIN courses c ON ch.course_id = c.id
@@ -154,7 +154,7 @@ func (r *Repository) FindLessonByID(id int) (*Lesson, error) {
 	var l Lesson
 	var isPubInt int
 	err := row.Scan(&l.ID, &l.ChapterID, &l.ChapterTitle, &l.CourseID, &l.CourseCode, &l.CourseName,
-		&l.Title, &l.ContentHTML, &l.OrderNum, &isPubInt, &l.CreatedAt)
+		&l.Title, &l.ContentHTML, &l.VisualizationType, &l.VisualizationConfig, &l.OrderNum, &isPubInt, &l.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrLessonNotFound
 	}
@@ -162,11 +162,6 @@ func (r *Repository) FindLessonByID(id int) (*Lesson, error) {
 		return nil, fmt.Errorf("truy vấn chi tiết bài học thất bại: %w", err)
 	}
 	l.IsPublished = isPubInt == 1
-
-	// Lấy visualization_type từ bài tập liên kết (nếu bảng exercises tồn tại)
-	var vizType string
-	_ = r.db.QueryRow(`SELECT visualization_type FROM exercises WHERE lesson_id = ? AND visualization_type IS NOT NULL AND visualization_type != '' LIMIT 1`, id).Scan(&vizType)
-	l.VisualizationType = vizType
 
 	return &l, nil
 }
@@ -179,9 +174,9 @@ func (r *Repository) CreateLesson(l *Lesson) error {
 	}
 
 	res, err := r.db.Exec(`
-		INSERT INTO lessons (chapter_id, title, content_html, order_num, is_published)
-		VALUES (?, ?, ?, ?, ?)
-	`, l.ChapterID, l.Title, l.ContentHTML, l.OrderNum, isPubInt)
+		INSERT INTO lessons (chapter_id, title, content_html, visualization_type, visualization_config, order_num, is_published)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, l.ChapterID, l.Title, l.ContentHTML, l.VisualizationType, l.VisualizationConfig, l.OrderNum, isPubInt)
 	if err != nil {
 		return fmt.Errorf("thêm bài học thất bại: %w", err)
 	}
@@ -202,9 +197,9 @@ func (r *Repository) UpdateLesson(l *Lesson) error {
 
 	res, err := r.db.Exec(`
 		UPDATE lessons
-		SET title = ?, content_html = ?, order_num = ?, is_published = ?
+		SET title = ?, content_html = ?, visualization_type = ?, visualization_config = ?, order_num = ?, is_published = ?
 		WHERE id = ?
-	`, l.Title, l.ContentHTML, l.OrderNum, isPubInt, l.ID)
+	`, l.Title, l.ContentHTML, l.VisualizationType, l.VisualizationConfig, l.OrderNum, isPubInt, l.ID)
 	if err != nil {
 		return fmt.Errorf("cập nhật bài học thất bại: %w", err)
 	}

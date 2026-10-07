@@ -34,6 +34,8 @@ func setupTestDB(t *testing.T) *sql.DB {
 			chapter_id INTEGER NOT NULL,
 			title TEXT NOT NULL,
 			content_html TEXT,
+			visualization_type TEXT DEFAULT '',
+			visualization_config TEXT DEFAULT '',
 			order_num INTEGER DEFAULT 0,
 			is_published INTEGER DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -124,14 +126,11 @@ func TestLessonAndCurriculum(t *testing.T) {
 		t.Errorf("Bài học chưa được cập nhật sang xuất bản")
 	}
 
-	// 8. Kiểm tra VisualizationType nếu bài học có bài tập liên kết
-	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS exercises (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		lesson_id INTEGER,
-		title TEXT,
-		visualization_type TEXT
-	);`)
-	_, _ = db.Exec(`INSERT INTO exercises (lesson_id, title, visualization_type) VALUES (?, 'Bài tập tìm kiếm', 'binary_search')`, l1.ID)
+	// 8. Kiểm tra VisualizationType trực thuộc bài học (Phase 3)
+	_, err = service.UpdateLesson(l1.ID, l1.Title, l1.ContentHTML, l1.OrderNum, l1.IsPublished, "binary_search")
+	if err != nil {
+		t.Fatalf("UpdateLesson lỗi: %v", err)
+	}
 
 	vDetail, _, err := service.GetLessonDetail(l1.ID, false)
 	if err != nil {

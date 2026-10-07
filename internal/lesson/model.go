@@ -26,10 +26,11 @@ type Lesson struct {
 	Title        string        `json:"title"`
 	ContentHTML       string        `json:"content_html"`
 	SafeHTML          template.HTML `json:"-"`
-	VisualizationType string        `json:"visualization_type,omitempty"`
-	OrderNum          int           `json:"order_num"`
-	IsPublished       bool          `json:"is_published"`
-	CreatedAt         time.Time     `json:"created_at"`
+	VisualizationType   string        `json:"visualization_type,omitempty"`
+	VisualizationConfig string        `json:"visualization_config,omitempty"`
+	OrderNum            int           `json:"order_num"`
+	IsPublished         bool          `json:"is_published"`
+	CreatedAt           time.Time     `json:"created_at"`
 }
 
 // CourseCurriculum đại diện cho toàn bộ cây chương mục và bài học của môn học

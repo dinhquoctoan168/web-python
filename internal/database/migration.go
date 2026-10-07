@@ -640,6 +640,37 @@ var migrations = []Migration{
 			return nil
 		},
 	},
+	{
+		Version: 16,
+		Name:    "lesson_visualization",
+		Up: func(tx *sql.Tx) error {
+			queries := []string{
+				`ALTER TABLE lessons ADD COLUMN visualization_type TEXT DEFAULT '';`,
+				`ALTER TABLE lessons ADD COLUMN visualization_config TEXT DEFAULT '';`,
+				`UPDATE lessons
+				SET visualization_type = (
+					SELECT e.visualization_type
+					FROM exercises e
+					WHERE e.lesson_id = lessons.id
+					  AND e.visualization_type IS NOT NULL
+					  AND e.visualization_type != ''
+					LIMIT 1
+				)
+				WHERE (visualization_type IS NULL OR visualization_type = '') AND EXISTS (
+					SELECT 1 FROM exercises e
+					WHERE e.lesson_id = lessons.id
+					  AND e.visualization_type IS NOT NULL
+					  AND e.visualization_type != ''
+				);`,
+			}
+			for _, q := range queries {
+				if _, err := tx.Exec(q); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // RunMigrations thực thi các migration chưa được áp dụng

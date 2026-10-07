@@ -94,7 +94,7 @@ func (s *Service) CreateChapter(courseID int, title, desc string, orderNum int) 
 }
 
 // CreateLesson tạo bài học mới
-func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNum int, isPublished bool) (*Lesson, error) {
+func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNum int, isPublished bool, vizType ...string) (*Lesson, error) {
 	title = strings.TrimSpace(title)
 	contentHTML = strings.TrimSpace(contentHTML)
 
@@ -102,12 +102,18 @@ func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNu
 		return nil, ErrInvalidLessonData
 	}
 
+	vt := ""
+	if len(vizType) > 0 {
+		vt = strings.TrimSpace(vizType[0])
+	}
+
 	l := &Lesson{
-		ChapterID:   chapterID,
-		Title:       title,
-		ContentHTML: contentHTML,
-		OrderNum:    orderNum,
-		IsPublished: isPublished,
+		ChapterID:         chapterID,
+		Title:             title,
+		ContentHTML:       contentHTML,
+		VisualizationType: vt,
+		OrderNum:          orderNum,
+		IsPublished:       isPublished,
 	}
 
 	if err := s.repo.CreateLesson(l); err != nil {
@@ -117,7 +123,7 @@ func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNu
 }
 
 // UpdateLesson cập nhật bài học
-func (s *Service) UpdateLesson(id int, title, contentHTML string, orderNum int, isPublished bool) (*Lesson, error) {
+func (s *Service) UpdateLesson(id int, title, contentHTML string, orderNum int, isPublished bool, vizType ...string) (*Lesson, error) {
 	title = strings.TrimSpace(title)
 	contentHTML = strings.TrimSpace(contentHTML)
 
@@ -134,6 +140,9 @@ func (s *Service) UpdateLesson(id int, title, contentHTML string, orderNum int, 
 	l.ContentHTML = contentHTML
 	l.OrderNum = orderNum
 	l.IsPublished = isPublished
+	if len(vizType) > 0 {
+		l.VisualizationType = strings.TrimSpace(vizType[0])
+	}
 
 	if err := s.repo.UpdateLesson(l); err != nil {
 		return nil, err

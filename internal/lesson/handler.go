@@ -159,6 +159,7 @@ func (h *Handler) HandleTeacherCreateLesson(w http.ResponseWriter, r *http.Reque
 	chapterID, _ := strconv.Atoi(r.FormValue("chapter_id"))
 	title := r.FormValue("title")
 	contentHTML := r.FormValue("content_html")
+	vizType := r.FormValue("visualization_type")
 	orderNum, _ := strconv.Atoi(r.FormValue("order_num"))
 	isPublished := r.FormValue("is_published") == "1"
 
@@ -173,7 +174,7 @@ func (h *Handler) HandleTeacherCreateLesson(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if _, err := h.service.CreateLesson(chapterID, title, contentHTML, orderNum, isPublished); err != nil {
+	if _, err := h.service.CreateLesson(chapterID, title, contentHTML, orderNum, isPublished, vizType); err != nil {
 		http.Error(w, "Lỗi tạo bài học: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -222,6 +223,7 @@ func (h *Handler) HandleTeacherUpdateLesson(w http.ResponseWriter, r *http.Reque
 	id, _ := strconv.Atoi(r.FormValue("id"))
 	title := r.FormValue("title")
 	contentHTML := r.FormValue("content_html")
+	vizType := r.FormValue("visualization_type")
 	orderNum, _ := strconv.Atoi(r.FormValue("order_num"))
 	isPublished := r.FormValue("is_published") == "1"
 
@@ -238,7 +240,7 @@ func (h *Handler) HandleTeacherUpdateLesson(w http.ResponseWriter, r *http.Reque
 
 	chapter, _ := h.service.GetChapterByID(lesson.ChapterID)
 
-	if _, err := h.service.UpdateLesson(id, title, contentHTML, orderNum, isPublished); err != nil {
+	if _, err := h.service.UpdateLesson(id, title, contentHTML, orderNum, isPublished, vizType); err != nil {
 		http.Error(w, "Lỗi cập nhật bài học: "+err.Error(), http.StatusBadRequest)
 		return
 	}
