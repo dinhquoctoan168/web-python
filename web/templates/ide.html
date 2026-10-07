@@ -18,16 +18,9 @@
         <div class="header-center">
             <span class="env-tag">Python 3.12</span>
             <span id="saveStatus" class="save-status saved" title="Tự động lưu mã nguồn">&#10003; Đã lưu</span>
-            <div id="examModeContainer" class="exam-status-box" style="display: none;">
-                <span class="exam-badge">&#9201; CHẾ ĐỘ THI</span>
-                <span id="examTimer" class="exam-timer">45:00</span>
-            </div>
         </div>
 
         <div class="header-right">
-            <button id="btnStartExam" class="btn btn-warning" title="Bắt đầu chế độ thi toàn màn hình có giám sát chống gian lận">
-                <span class="icon">&#128274;</span> Bắt đầu thi
-            </button>
             <button id="btnResetCode" class="btn btn-secondary" title="Khôi phục mã ban đầu">
                 <span class="icon">&#8635;</span> Đặt lại
             </button>
@@ -273,21 +266,6 @@
                 </div>
             </div>
         </main>
-    </div>
-</div>
-
-<!-- Overlay đình chỉ thi khi phát hiện gian lận -->
-<div id="examSuspendedOverlay" class="exam-overlay" style="display: none;">
-    <div class="exam-modal">
-        <div class="modal-icon">&#9888;</div>
-        <h2>BÀI THI BỊ ĐÌNH CHỈ</h2>
-        <div class="modal-badge">PHÁT HIỆN HÀNH VI GIAN LẬN</div>
-        <p class="modal-reason" id="suspendedReason">Bạn đã chuyển sang trang khác hoặc làm mất tiêu điểm màn hình thi.</p>
-        <div class="modal-details">
-            <p>Hệ thống giám sát tự động đã phát hiện hành vi vi phạm quy chế thi.</p>
-            <p>Toàn bộ quyền chỉnh sửa mã nguồn, chạy mã và chấm thử đã bị khóa.</p>
-        </div>
-        <div class="modal-time" id="suspendedTime">Thời điểm vi phạm: --:--:--</div>
     </div>
 </div>
 
