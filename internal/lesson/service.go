@@ -3,8 +3,22 @@ package lesson
 import (
 	"errors"
 	"html/template"
+	"regexp"
 	"strings"
+
+	"github.com/microcosm-cc/bluemonday"
 )
+
+var sanitizer = func() *bluemonday.Policy {
+	p := bluemonday.UGCPolicy()
+	p.AllowAttrs("class").Matching(regexp.MustCompile(`^[\w\s-]+$`)).OnElements("code", "pre", "div", "span")
+	return p
+}()
+
+// SanitizeHTML làm sạch mã HTML của bài học để chống tấn công XSS
+func SanitizeHTML(input string) string {
+	return sanitizer.Sanitize(input)
+}
 
 var (
 	ErrInvalidChapterData = errors.New("tiêu đề chương không được để trống")
@@ -96,7 +110,7 @@ func (s *Service) CreateChapter(courseID int, title, desc string, orderNum int) 
 // CreateLesson tạo bài học mới
 func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNum int, isPublished bool, vizType ...string) (*Lesson, error) {
 	title = strings.TrimSpace(title)
-	contentHTML = strings.TrimSpace(contentHTML)
+	contentHTML = SanitizeHTML(strings.TrimSpace(contentHTML))
 
 	if chapterID <= 0 || title == "" {
 		return nil, ErrInvalidLessonData
@@ -125,7 +139,7 @@ func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNu
 // UpdateLesson cập nhật bài học
 func (s *Service) UpdateLesson(id int, title, contentHTML string, orderNum int, isPublished bool, vizType ...string) (*Lesson, error) {
 	title = strings.TrimSpace(title)
-	contentHTML = strings.TrimSpace(contentHTML)
+	contentHTML = SanitizeHTML(strings.TrimSpace(contentHTML))
 
 	if id <= 0 || title == "" {
 		return nil, ErrInvalidLessonData
