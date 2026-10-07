@@ -21,8 +21,9 @@ func SanitizeHTML(input string) string {
 }
 
 var (
-	ErrInvalidChapterData = errors.New("tiêu đề chương không được để trống")
-	ErrInvalidLessonData  = errors.New("tiêu đề bài học không được để trống")
+	ErrInvalidChapterData           = errors.New("tiêu đề chương không được để trống")
+	ErrInvalidLessonData            = errors.New("tiêu đề bài học không được để trống")
+	ErrUnsupportedVisualizationType = errors.New("loại trực quan hóa không được hỗ trợ")
 )
 
 // Service cung cấp logic nghiệp vụ cho chương mục và bài học
@@ -123,7 +124,11 @@ func (s *Service) CreateLesson(chapterID int, title, contentHTML string, orderNu
 
 	vt := ""
 	if len(vizType) > 0 {
-		vt = strings.TrimSpace(vizType[0])
+		rawVt := strings.TrimSpace(vizType[0])
+		if !IsSupportedVisualizationType(rawVt) {
+			return nil, ErrUnsupportedVisualizationType
+		}
+		vt = NormalizeVisualizationType(rawVt)
 	}
 
 	l := &Lesson{
@@ -160,7 +165,11 @@ func (s *Service) UpdateLesson(id int, title, contentHTML string, orderNum int, 
 	l.OrderNum = orderNum
 	l.IsPublished = isPublished
 	if len(vizType) > 0 {
-		l.VisualizationType = strings.TrimSpace(vizType[0])
+		rawVt := strings.TrimSpace(vizType[0])
+		if !IsSupportedVisualizationType(rawVt) {
+			return nil, ErrUnsupportedVisualizationType
+		}
+		l.VisualizationType = NormalizeVisualizationType(rawVt)
 	}
 
 	if err := s.repo.UpdateLesson(l); err != nil {

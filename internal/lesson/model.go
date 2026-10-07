@@ -2,8 +2,36 @@ package lesson
 
 import (
 	"html/template"
+	"strings"
 	"time"
 )
+
+// SupportedVisualizationTypes danh sách các loại trực quan hóa đã được triển khai đầy đủ
+var SupportedVisualizationTypes = map[string]bool{
+	"":              true,
+	"array":         true,
+	"stack":         true,
+	"binary_search": true,
+	"sorting":       true,
+}
+
+// IsSupportedVisualizationType kiểm tra loại trực quan hóa có được hỗ trợ hay không
+func IsSupportedVisualizationType(v string) bool {
+	v = strings.TrimSpace(v)
+	if v == "none" {
+		return true
+	}
+	return SupportedVisualizationTypes[v]
+}
+
+// NormalizeVisualizationType chuẩn hóa loại trực quan hóa (ví dụ 'none' thành '')
+func NormalizeVisualizationType(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "none" {
+		return ""
+	}
+	return v
+}
 
 // Chapter đại diện cho một chương mục trong môn học
 type Chapter struct {

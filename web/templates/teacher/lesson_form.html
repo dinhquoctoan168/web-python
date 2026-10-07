@@ -75,11 +75,8 @@
                         <option value="" {{ if and .Lesson (eq .Lesson.VisualizationType "") }}selected{{ end }}>-- Không có (none) --</option>
                         <option value="array" {{ if and .Lesson (eq .Lesson.VisualizationType "array") }}selected{{ end }}>Mảng (Array)</option>
                         <option value="stack" {{ if and .Lesson (eq .Lesson.VisualizationType "stack") }}selected{{ end }}>Ngăn xếp (Stack)</option>
-                        <option value="queue" {{ if and .Lesson (eq .Lesson.VisualizationType "queue") }}selected{{ end }}>Hàng đợi (Queue)</option>
                         <option value="binary_search" {{ if and .Lesson (eq .Lesson.VisualizationType "binary_search") }}selected{{ end }}>Tìm kiếm nhị phân (Binary Search)</option>
                         <option value="sorting" {{ if and .Lesson (eq .Lesson.VisualizationType "sorting") }}selected{{ end }}>Thuật toán sắp xếp (Sorting)</option>
-                        <option value="tree" {{ if and .Lesson (eq .Lesson.VisualizationType "tree") }}selected{{ end }}>Cây nhị phân (Tree)</option>
-                        <option value="graph" {{ if and .Lesson (eq .Lesson.VisualizationType "graph") }}selected{{ end }}>Đồ thị (Graph)</option>
                     </select>
                 </div>
 
