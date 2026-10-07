@@ -10,11 +10,13 @@ import (
 	"strconv"
 
 	"web_python/internal/logic"
+	"web_python/internal/security"
 )
 
 // IDEPageData chứa dữ liệu truyền vào template HTML của IDE
 type IDEPageData struct {
 	Title           string
+	CSRFToken       string
 	CourseCode      string
 	Chapters        []logic.ChapterItem
 	Topics          []logic.Topic // Tương thích ngược với các template cũ
@@ -69,6 +71,7 @@ func HandleIDE(w http.ResponseWriter, r *http.Request) {
 
 	data := IDEPageData{
 		Title:           "Web Python IDE - CSDL & Giải thuật",
+		CSRFToken:       security.GetTokenFromContext(r.Context()),
 		CourseCode:      courseCode,
 		Chapters:        chapters,
 		Topics:          topics,
