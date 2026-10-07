@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"web_python/internal/audit"
+	"web_python/internal/class"
 )
 
 type Service struct {
 	repo         *Repository
 	auditService *audit.Service
+	classService *class.Service
 }
 
 func NewService(repo *Repository) *Service {
@@ -19,6 +21,48 @@ func NewService(repo *Repository) *Service {
 
 func (s *Service) SetAuditService(as *audit.Service) {
 	s.auditService = as
+}
+
+func (s *Service) SetClassService(cs *class.Service) {
+	s.classService = cs
+}
+
+// GetAssignmentForStudent lấy bài tập cho học viên và kiểm tra tính hợp lệ
+func (s *Service) GetAssignmentForStudent(assignmentID, studentID int) (*Assignment, error) {
+	if assignmentID <= 0 || studentID <= 0 {
+		return nil, errors.New("thông tin bài tập hoặc học viên không hợp lệ")
+	}
+	asgn, err := s.GetAssignment(assignmentID)
+	if err != nil {
+		return nil, err
+	}
+	if asgn.Status != StatusPublished {
+		return nil, errors.New("bài tập chưa được công bố")
+	}
+	if s.classService != nil {
+		enrolled, err := s.classService.IsStudentEnrolled(asgn.ClassID, studentID)
+		if err != nil || !enrolled {
+			return nil, errors.New("học viên không thuộc lớp học được giao bài tập")
+		}
+	}
+	return asgn, nil
+}
+
+// AssignmentContainsExercise kiểm tra bài tập có chứa câu hỏi này không
+func (s *Service) AssignmentContainsExercise(assignmentID, exerciseID int) (bool, error) {
+	if assignmentID <= 0 || exerciseID <= 0 {
+		return false, nil
+	}
+	asgn, err := s.GetAssignment(assignmentID)
+	if err != nil {
+		return false, err
+	}
+	for _, ex := range asgn.Exercises {
+		if ex.ExerciseID == exerciseID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // CreateAssignment xử lý tạo mới bài tập cho lớp

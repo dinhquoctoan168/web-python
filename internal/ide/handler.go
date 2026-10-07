@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"web_python/internal/assignment"
+	"web_python/internal/auth"
 	"web_python/internal/course"
 	"web_python/internal/exercise"
 	"web_python/internal/lesson"
@@ -27,6 +28,7 @@ type PageData struct {
 	Mode            string
 	AssignmentID    int
 	Chapters        []exercise.ChapterWithExercises
+	Topics          []logic.Topic
 	CurrentExercise *exercise.ClientExerciseDetail
 	Functions       []logic.FunctionItem
 }
@@ -80,30 +82,75 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Xử lý chế độ Assignment nếu có assignment_id
-	assignmentIDStr := strings.TrimSpace(r.URL.Query().Get("assignment_id"))
-	if mode == "assignment" && assignmentIDStr != "" {
-		if aid, err := strconv.Atoi(assignmentIDStr); err == nil && aid > 0 {
-			assignmentID = aid
-			if h.assignmentService != nil {
-				if asgn, err := h.assignmentService.GetAssignment(aid); err == nil && asgn != nil {
-					courseCode = asgn.CourseCode
-					courseName = asgn.CourseName
-					asgnChapter := exercise.ChapterWithExercises{
-						ID:          asgn.ID,
-						Title:       asgn.Title,
-						Description: asgn.Description,
-					}
-					for _, ae := range asgn.Exercises {
-						if d, err := h.exerciseService.GetExerciseForClient(ae.ExerciseID); err == nil && d != nil {
-							asgnChapter.Exercises = append(asgnChapter.Exercises, *d)
-						}
-					}
-					chapters = append(chapters, asgnChapter)
-					if currentExercise == nil && len(asgnChapter.Exercises) > 0 {
-						currentExercise = &asgnChapter.Exercises[0]
-					}
+	if mode == "assignment" {
+		assignmentIDStr := strings.TrimSpace(r.URL.Query().Get("assignment_id"))
+		if assignmentIDStr == "" {
+			http.Error(w, "Thiếu mã đợt bài tập (assignment_id)", http.StatusBadRequest)
+			return
+		}
+		aid, err := strconv.Atoi(assignmentIDStr)
+		if err != nil || aid <= 0 {
+			http.Error(w, "ID bài tập không hợp lệ", http.StatusBadRequest)
+			return
+		}
+		if h.assignmentService == nil {
+			http.Error(w, "Dịch vụ bài tập chưa sẵn sàng", http.StatusInternalServerError)
+			return
+		}
+
+		user := auth.GetUser(r.Context())
+		if user == nil {
+			http.Error(w, "Yêu cầu đăng nhập để truy cập bài tập", http.StatusForbidden)
+			return
+		}
+
+		var asgn *assignment.Assignment
+		if user.Role == auth.RoleStudent {
+			asgn, err = h.assignmentService.GetAssignmentForStudent(aid, user.ID)
+			if err != nil || asgn == nil {
+				http.Error(w, "Bạn không có quyền truy cập bài tập này", http.StatusForbidden)
+				return
+			}
+		} else {
+			asgn, err = h.assignmentService.GetAssignment(aid)
+			if err != nil || asgn == nil {
+				http.Error(w, "Không tìm thấy bài tập", http.StatusNotFound)
+				return
+			}
+			if user.Role == auth.RoleTeacher && asgn.CreatedBy != user.ID && user.Role != auth.RoleAdmin {
+				http.Error(w, "Bạn không có quyền quản lý bài tập này", http.StatusForbidden)
+				return
+			}
+		}
+
+		assignmentID = aid
+
+		// Nếu có chỉ định exercise id cụ thể, kiểm tra exercise đó có thuộc assignment không
+		if exIDStr != "" {
+			if id, err := strconv.Atoi(exIDStr); err == nil && id > 0 {
+				contains, err := h.assignmentService.AssignmentContainsExercise(aid, id)
+				if err != nil || !contains {
+					http.Error(w, "Bài tập không thuộc đợt giao này", http.StatusForbidden)
+					return
 				}
 			}
+		}
+
+		courseCode = asgn.CourseCode
+		courseName = asgn.CourseName
+		asgnChapter := exercise.ChapterWithExercises{
+			ID:          asgn.ID,
+			Title:       asgn.Title,
+			Description: asgn.Description,
+		}
+		for _, ae := range asgn.Exercises {
+			if d, err := h.exerciseService.GetExerciseForClient(ae.ExerciseID); err == nil && d != nil {
+				asgnChapter.Exercises = append(asgnChapter.Exercises, *d)
+			}
+		}
+		chapters = append(chapters, asgnChapter)
+		if currentExercise == nil && len(asgnChapter.Exercises) > 0 {
+			currentExercise = &asgnChapter.Exercises[0]
 		}
 	}
 

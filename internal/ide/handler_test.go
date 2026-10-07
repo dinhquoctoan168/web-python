@@ -24,7 +24,6 @@ func TestHandleIDE(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB error: %v", err)
 	}
-	defer database.CloseDB()
 
 	cRepo := course.NewRepository(db)
 	cService := course.NewService(cRepo)

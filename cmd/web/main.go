@@ -150,6 +150,7 @@ func main() {
 	auditService := audit.NewService(auditRepo)
 	classService.SetAuditService(auditService)
 	assignmentService.SetAuditService(auditService)
+	assignmentService.SetClassService(classService)
 	examService.SetAuditService(auditService)
 	submissionService.SetAuditService(auditService)
 
