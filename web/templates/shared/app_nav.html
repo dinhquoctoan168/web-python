@@ -45,6 +45,22 @@
             <span class="home-icon">{{ if or (eq .Role "teacher") (eq .Role "admin") }}&#127891;{{ else }}&#128187;{{ end }}</span>
             <span class="home-title">{{ if or (eq .Role "teacher") (eq .Role "admin") }}Teacher{{ else }}Trang chủ{{ end }}</span>
         </a>
+        {{ if .Breadcrumbs }}
+        <nav aria-label="Đường dẫn phân cấp IDE" class="nav-compact-breadcrumbs">
+            <ol class="compact-breadcrumb-list">
+                {{ range $idx, $crumb := .Breadcrumbs }}
+                <li class="compact-breadcrumb-item {{ if not $crumb.URL }}current{{ end }}">
+                    {{ if $crumb.URL }}
+                        <a href="{{ $crumb.URL }}">{{ $crumb.Label }}</a>
+                        <span class="compact-breadcrumb-separator">/</span>
+                    {{ else }}
+                        <span aria-current="page" id="ideCurrentBreadcrumb">{{ $crumb.Label }}</span>
+                    {{ end }}
+                </li>
+                {{ end }}
+            </ol>
+        </nav>
+        {{ end }}
     </div>
 
     <div class="nav-compact-menu">

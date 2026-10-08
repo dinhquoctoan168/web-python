@@ -68,12 +68,14 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := auth.GetUser(r.Context())
 	mode := r.URL.Query().Get("mode")
 	if mode == "" {
 		mode = "practice"
 	}
 
 	var currentExercise *exercise.ClientExerciseDetail
+	var asgn *assignment.Assignment
 	var courseCode string
 	var courseName string
 	var assignmentID int
@@ -103,13 +105,11 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		user := auth.GetUser(r.Context())
 		if user == nil {
 			http.Error(w, "Yêu cầu đăng nhập để truy cập bài tập", http.StatusForbidden)
 			return
 		}
 
-		var asgn *assignment.Assignment
 		if user.Role == auth.RoleStudent {
 			asgn, err = h.assignmentService.GetAssignmentForStudent(aid, user.ID)
 			if err != nil || asgn == nil {
@@ -159,10 +159,24 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var validLesson *lesson.Lesson
+	var targetCourse *course.Course
+
 	// 2. Chế độ Practice thông thường
 	if len(chapters) == 0 {
-		var targetCourse *course.Course
 		courseParam := strings.TrimSpace(r.URL.Query().Get("course"))
+		if courseParam == "" {
+			courseParam = strings.TrimSpace(r.URL.Query().Get("course_id"))
+		}
+
+		// Xác thực bài học lý thuyết nếu có tham số lesson_id
+		lessonIDStr := strings.TrimSpace(r.URL.Query().Get("lesson_id"))
+		if lid, err := strconv.Atoi(lessonIDStr); err == nil && lid > 0 && h.lessonService != nil {
+			isTeacher := user != nil && (user.Role == auth.RoleTeacher || user.Role == auth.RoleAdmin)
+			if l, _, err := h.lessonService.GetLessonDetail(lid, isTeacher); err == nil && l != nil {
+				validLesson = l
+			}
+		}
 
 		// Ưu tiên 1: Lấy course từ exercise nếu đã xác định được exercise
 		if currentExercise != nil && currentExercise.CourseID > 0 {
@@ -179,12 +193,22 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Ưu tiên 3: Lấy môn học đầu tiên học viên đang theo học / active
+		// Ưu tiên 3: Lấy course từ lesson đã xác thực
+		if targetCourse == nil && validLesson != nil && validLesson.CourseID > 0 {
+			targetCourse, _ = h.courseService.GetCourseByID(validLesson.CourseID)
+		}
+
+		// Ưu tiên 4: Lấy môn học đầu tiên học viên đang theo học / active
 		if targetCourse == nil {
 			courses, err := h.courseService.ListCoursesForStudent()
 			if err == nil && len(courses) > 0 {
 				targetCourse = &courses[0]
 			}
+		}
+
+		// Kiểm tra xung đột: nếu lesson không thuộc targetCourse đang luyện tập thì bỏ qua lesson context phụ
+		if validLesson != nil && targetCourse != nil && validLesson.CourseID != targetCourse.ID {
+			validLesson = nil
 		}
 
 		if targetCourse != nil {
@@ -218,10 +242,10 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 		title = "Web Python IDE - " + courseName
 	}
 
-	user := auth.GetUser(r.Context())
-	backURL, backLabel := ResolveIDEBackContext(r, user)
+	hasExplicitCourse := r.URL.Query().Get("course") != "" || r.URL.Query().Get("course_id") != ""
+	ideCtx := BuildValidatedIDEContext(user, mode, asgn, validLesson, targetCourse, hasExplicitCourse, currentExercise)
 	csrfToken := security.GetTokenFromContext(r.Context())
-	nav := frontend.BuildNavigationData(user, "ide", nil, backURL, backLabel, csrfToken)
+	nav := frontend.BuildNavigationData(user, "ide", ideCtx.Breadcrumbs, ideCtx.BackURL, ideCtx.BackLabel, csrfToken)
 
 	data := PageData{
 		Title:           title,
@@ -255,41 +279,184 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ResolveIDEBackContext xác định BackURL và BackLabel theo tham số query và vai trò người dùng
+// IDEBackContext chứa thông tin điều hướng và breadcrumb đã được xác thực
+type IDEBackContext struct {
+	BackURL     string
+	BackLabel   string
+	Breadcrumbs []frontend.Breadcrumb
+}
+
+// BuildValidatedIDEContext tạo BackURL, BackLabel và Breadcrumbs dựa trên các thực thể đã xác thực
+func BuildValidatedIDEContext(user *auth.User, mode string, asgn *assignment.Assignment, validLesson *lesson.Lesson, targetCourse *course.Course, hasExplicitCourse bool, currentExercise *exercise.ClientExerciseDetail) IDEBackContext {
+	isTeacher := user != nil && (user.Role == auth.RoleTeacher || user.Role == auth.RoleAdmin)
+	var exTitle string
+	if currentExercise != nil && currentExercise.Title != "" {
+		exTitle = currentExercise.Title
+	} else {
+		exTitle = "IDE"
+	}
+
+	// 1. Ngữ cảnh Assignment (đã được xác thực trong handler)
+	if mode == "assignment" && asgn != nil {
+		if isTeacher {
+			return IDEBackContext{
+				BackURL:   fmt.Sprintf("/teacher/assignment?id=%d", asgn.ID),
+				BackLabel: "Quay lại Bài tập",
+				Breadcrumbs: []frontend.Breadcrumb{
+					{Label: "Teacher", URL: "/teacher"},
+					{Label: "Bài tập", URL: "/teacher/assignments"},
+					{Label: asgn.Title, URL: fmt.Sprintf("/teacher/assignment?id=%d", asgn.ID)},
+					{Label: exTitle, URL: ""},
+				},
+			}
+		}
+		return IDEBackContext{
+			BackURL:   fmt.Sprintf("/assignment?id=%d", asgn.ID),
+			BackLabel: "Quay lại Bài tập",
+			Breadcrumbs: []frontend.Breadcrumb{
+				{Label: "Trang chủ", URL: "/dashboard"},
+				{Label: "Bài tập", URL: "/assignments"},
+				{Label: asgn.Title, URL: fmt.Sprintf("/assignment?id=%d", asgn.ID)},
+				{Label: exTitle, URL: ""},
+			},
+		}
+	}
+
+	// 2. Ngữ cảnh Lesson (đã xác thực qua lessonService và thuộc đúng course)
+	if validLesson != nil {
+		if isTeacher {
+			bc := []frontend.Breadcrumb{
+				{Label: "Teacher", URL: "/teacher"},
+				{Label: "Môn học", URL: "/teacher/courses"},
+			}
+			if targetCourse != nil {
+				bc = append(bc, frontend.Breadcrumb{
+					Label: targetCourse.Name,
+					URL:   fmt.Sprintf("/teacher/curriculum?course_id=%d", targetCourse.ID),
+				})
+			}
+			bc = append(bc, frontend.Breadcrumb{
+				Label: validLesson.Title,
+				URL:   fmt.Sprintf("/lesson?id=%d", validLesson.ID),
+			})
+			bc = append(bc, frontend.Breadcrumb{
+				Label: "IDE",
+				URL:   "",
+			})
+			return IDEBackContext{
+				BackURL:     fmt.Sprintf("/lesson?id=%d", validLesson.ID),
+				BackLabel:   "Quay lại Bài học",
+				Breadcrumbs: bc,
+			}
+		}
+		bc := []frontend.Breadcrumb{
+			{Label: "Trang chủ", URL: "/dashboard"},
+			{Label: "Khóa học", URL: "/courses"},
+		}
+		if targetCourse != nil {
+			bc = append(bc, frontend.Breadcrumb{
+				Label: targetCourse.Name,
+				URL:   fmt.Sprintf("/course?id=%d", targetCourse.ID),
+			})
+		}
+		bc = append(bc, frontend.Breadcrumb{
+			Label: validLesson.Title,
+			URL:   fmt.Sprintf("/lesson?id=%d", validLesson.ID),
+		})
+		bc = append(bc, frontend.Breadcrumb{
+			Label: "IDE",
+			URL:   "",
+		})
+		return IDEBackContext{
+			BackURL:     fmt.Sprintf("/lesson?id=%d", validLesson.ID),
+			BackLabel:   "Quay lại Bài học",
+			Breadcrumbs: bc,
+		}
+	}
+
+	// 3. Ngữ cảnh Course rõ ràng (có course param trong query)
+	if hasExplicitCourse && targetCourse != nil {
+		if isTeacher {
+			return IDEBackContext{
+				BackURL:   fmt.Sprintf("/teacher/curriculum?course_id=%d", targetCourse.ID),
+				BackLabel: "Quay lại Chương trình",
+				Breadcrumbs: []frontend.Breadcrumb{
+					{Label: "Teacher", URL: "/teacher"},
+					{Label: "Môn học", URL: "/teacher/courses"},
+					{Label: targetCourse.Name, URL: fmt.Sprintf("/teacher/curriculum?course_id=%d", targetCourse.ID)},
+					{Label: exTitle, URL: ""},
+				},
+			}
+		}
+		return IDEBackContext{
+			BackURL:   fmt.Sprintf("/course?id=%d", targetCourse.ID),
+			BackLabel: "Quay lại Môn học",
+			Breadcrumbs: []frontend.Breadcrumb{
+				{Label: "Trang chủ", URL: "/dashboard"},
+				{Label: "Khóa học", URL: "/courses"},
+				{Label: targetCourse.Name, URL: fmt.Sprintf("/course?id=%d", targetCourse.ID)},
+				{Label: exTitle, URL: ""},
+			},
+		}
+	}
+
+	// 4. Mở trực tiếp tự do
+	if isTeacher {
+		return IDEBackContext{
+			BackURL:   "/teacher",
+			BackLabel: "Quay lại Bảng điều khiển",
+			Breadcrumbs: []frontend.Breadcrumb{
+				{Label: "Teacher", URL: "/teacher"},
+				{Label: "IDE", URL: ""},
+			},
+		}
+	}
+	if user != nil {
+		return IDEBackContext{
+			BackURL:   "/dashboard",
+			BackLabel: "Quay lại Trang chủ",
+			Breadcrumbs: []frontend.Breadcrumb{
+				{Label: "Trang chủ", URL: "/dashboard"},
+				{Label: "IDE", URL: ""},
+			},
+		}
+	}
+	return IDEBackContext{
+		BackURL:   "/courses",
+		BackLabel: "Quay lại Môn học",
+		Breadcrumbs: []frontend.Breadcrumb{
+			{Label: "Khóa học", URL: "/courses"},
+			{Label: "IDE", URL: ""},
+		},
+	}
+}
+
+// ResolveIDEBackContext xác định BackURL và BackLabel theo tham số query và vai trò người dùng (loại bỏ exam giả lập)
 func ResolveIDEBackContext(r *http.Request, user *auth.User) (string, string) {
 	isTeacher := user != nil && (user.Role == auth.RoleTeacher || user.Role == auth.RoleAdmin)
 
 	// 1. Ngữ cảnh làm bài tập (assignment)
 	assignmentIDStr := strings.TrimSpace(r.URL.Query().Get("assignment_id"))
-	if assignmentIDStr != "" {
+	if aid, err := strconv.Atoi(assignmentIDStr); err == nil && aid > 0 {
 		if isTeacher {
-			return fmt.Sprintf("/teacher/assignment?id=%s", assignmentIDStr), "Quay lại Bài tập"
+			return fmt.Sprintf("/teacher/assignment?id=%d", aid), "Quay lại Bài tập"
 		}
-		return fmt.Sprintf("/assignment?id=%s", assignmentIDStr), "Quay lại Bài tập"
+		return fmt.Sprintf("/assignment?id=%d", aid), "Quay lại Bài tập"
 	}
 
 	// 2. Ngữ cảnh từ bài học lý thuyết
 	lessonIDStr := strings.TrimSpace(r.URL.Query().Get("lesson_id"))
-	if lessonIDStr != "" {
-		return fmt.Sprintf("/lesson?id=%s", lessonIDStr), "Quay lại Bài học"
+	if lid, err := strconv.Atoi(lessonIDStr); err == nil && lid > 0 {
+		return fmt.Sprintf("/lesson?id=%d", lid), "Quay lại Bài học"
 	}
 
-	// 3. Ngữ cảnh từ kỳ thi
-	examIDStr := strings.TrimSpace(r.URL.Query().Get("exam_id"))
-	if examIDStr != "" {
-		if isTeacher {
-			return fmt.Sprintf("/teacher/exam/monitoring?id=%s", examIDStr), "Quay lại Kỳ thi"
-		}
-		return "/my-exams", "Quay lại Kỳ thi"
-	}
-
-	// 4. Ngữ cảnh từ môn học cụ thể
+	// 3. Ngữ cảnh từ môn học cụ thể
 	courseIDStr := strings.TrimSpace(r.URL.Query().Get("course_id"))
-	if courseIDStr != "" {
+	if cid, err := strconv.Atoi(courseIDStr); err == nil && cid > 0 {
 		if isTeacher {
-			return fmt.Sprintf("/teacher/curriculum?course_id=%s", courseIDStr), "Quay lại Chương trình"
+			return fmt.Sprintf("/teacher/curriculum?course_id=%d", cid), "Quay lại Chương trình"
 		}
-		return fmt.Sprintf("/course?id=%s", courseIDStr), "Quay lại Môn học"
+		return fmt.Sprintf("/course?id=%d", cid), "Quay lại Môn học"
 	}
 
 	courseCode := strings.TrimSpace(r.URL.Query().Get("course"))
@@ -300,7 +467,7 @@ func ResolveIDEBackContext(r *http.Request, user *auth.User) (string, string) {
 		return "/courses", "Quay lại Môn học"
 	}
 
-	// 5. Mặc định theo vai trò người dùng
+	// 4. Mặc định theo vai trò người dùng
 	if isTeacher {
 		return "/teacher", "Quay lại Bảng điều khiển"
 	}

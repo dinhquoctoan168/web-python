@@ -174,18 +174,32 @@ func TestResolveIDEBackContext(t *testing.T) {
 			expectedLabel: "Quay lại Bài học",
 		},
 		{
-			name:          "Exam context for student",
+			name:          "Ignore fake exam context for student and fallback to dashboard",
 			queryURL:      "/ide?exam_id=3",
 			user:          studentUser,
-			expectedURL:   "/my-exams",
-			expectedLabel: "Quay lại Kỳ thi",
+			expectedURL:   "/dashboard",
+			expectedLabel: "Quay lại Trang chủ",
 		},
 		{
-			name:          "Exam context for teacher",
+			name:          "Ignore fake exam context for teacher and fallback to teacher home",
 			queryURL:      "/ide?exam_id=3",
 			user:          teacherUser,
-			expectedURL:   "/teacher/exam/monitoring?id=3",
-			expectedLabel: "Quay lại Kỳ thi",
+			expectedURL:   "/teacher",
+			expectedLabel: "Quay lại Bảng điều khiển",
+		},
+		{
+			name:          "Invalid negative assignment_id falls back to student home",
+			queryURL:      "/ide?assignment_id=-1",
+			user:          studentUser,
+			expectedURL:   "/dashboard",
+			expectedLabel: "Quay lại Trang chủ",
+		},
+		{
+			name:          "Invalid string lesson_id falls back to student home",
+			queryURL:      "/ide?lesson_id=abc",
+			user:          studentUser,
+			expectedURL:   "/dashboard",
+			expectedLabel: "Quay lại Trang chủ",
 		},
 		{
 			name:          "Course ID for student",
@@ -252,6 +266,72 @@ func TestResolveIDEBackContext(t *testing.T) {
 	}
 }
 
+func TestBuildValidatedIDEContext(t *testing.T) {
+	studentUser := &auth.User{ID: 10, Username: "student", Role: auth.RoleStudent}
+	teacherUser := &auth.User{ID: 2, Username: "teacher", Role: auth.RoleTeacher}
+
+	asgn := &assignment.Assignment{
+		ID:    5,
+		Title: "Bài tập Tuần 1",
+	}
+	sampleLesson := &lesson.Lesson{
+		ID:       12,
+		Title:    "Biến và Kiểu dữ liệu",
+		CourseID: 1,
+	}
+	sampleCourse := &course.Course{
+		ID:   1,
+		Code: "PY101",
+		Name: "Lập trình Python Cơ bản",
+	}
+	sampleEx := &exercise.ClientExerciseDetail{
+		ID:    101,
+		Title: "Tính tổng hai số",
+	}
+
+	// 1. Assignment mode for student
+	ctxAsgnS := BuildValidatedIDEContext(studentUser, "assignment", asgn, nil, sampleCourse, false, sampleEx)
+	if ctxAsgnS.BackURL != "/assignment?id=5" {
+		t.Errorf("Kỳ vọng BackURL /assignment?id=5, nhận %s", ctxAsgnS.BackURL)
+	}
+	if len(ctxAsgnS.Breadcrumbs) != 4 || ctxAsgnS.Breadcrumbs[2].Label != "Bài tập Tuần 1" {
+		t.Errorf("Breadcrumbs không khớp cho student assignment: %+v", ctxAsgnS.Breadcrumbs)
+	}
+
+	// 2. Assignment mode for teacher
+	ctxAsgnT := BuildValidatedIDEContext(teacherUser, "assignment", asgn, nil, sampleCourse, false, sampleEx)
+	if ctxAsgnT.BackURL != "/teacher/assignment?id=5" {
+		t.Errorf("Kỳ vọng BackURL /teacher/assignment?id=5, nhận %s", ctxAsgnT.BackURL)
+	}
+	if len(ctxAsgnT.Breadcrumbs) != 4 || ctxAsgnT.Breadcrumbs[2].Label != "Bài tập Tuần 1" {
+		t.Errorf("Breadcrumbs không khớp cho teacher assignment: %+v", ctxAsgnT.Breadcrumbs)
+	}
+
+	// 3. Lesson context
+	ctxLesson := BuildValidatedIDEContext(studentUser, "practice", nil, sampleLesson, sampleCourse, false, sampleEx)
+	if ctxLesson.BackURL != "/lesson?id=12" {
+		t.Errorf("Kỳ vọng BackURL /lesson?id=12, nhận %s", ctxLesson.BackURL)
+	}
+	if len(ctxLesson.Breadcrumbs) < 3 {
+		t.Errorf("Breadcrumbs cho lesson quá ngắn: %+v", ctxLesson.Breadcrumbs)
+	}
+
+	// 4. Course context with explicit param
+	ctxCourse := BuildValidatedIDEContext(studentUser, "practice", nil, nil, sampleCourse, true, sampleEx)
+	if ctxCourse.BackURL != "/course?id=1" {
+		t.Errorf("Kỳ vọng BackURL /course?id=1, nhận %s", ctxCourse.BackURL)
+	}
+
+	// 5. Direct open
+	ctxDirect := BuildValidatedIDEContext(studentUser, "practice", nil, nil, nil, false, nil)
+	if ctxDirect.BackURL != "/dashboard" {
+		t.Errorf("Kỳ vọng BackURL /dashboard, nhận %s", ctxDirect.BackURL)
+	}
+	if len(ctxDirect.Breadcrumbs) != 2 {
+		t.Errorf("Breadcrumbs direct open kỳ vọng 2 items, nhận %+v", ctxDirect.Breadcrumbs)
+	}
+}
+
 func TestHandleIDE_NavigationContextRendering(t *testing.T) {
 	origDir, _ := os.Getwd()
 	if strings.HasSuffix(origDir, "ide") {
@@ -275,9 +355,9 @@ func TestHandleIDE_NavigationContextRendering(t *testing.T) {
 
 	handler := NewHandler(cService, lService, eService, aService)
 
-	// 1. Sinh viên vào IDE từ bài học
+	// 1. Sinh viên vào IDE từ bài học hợp lệ của môn học
 	studentUser := &auth.User{ID: 10, Username: "sv_an", FullName: "Nguyen Van An", Role: auth.RoleStudent}
-	reqStudent := httptest.NewRequest("GET", "/ide?mode=practice&course=PY101&lesson_id=12", nil)
+	reqStudent := httptest.NewRequest("GET", "/ide?mode=practice&course=PY101&lesson_id=1", nil)
 	reqStudent = reqStudent.WithContext(auth.WithUser(reqStudent.Context(), studentUser))
 	recStudent := httptest.NewRecorder()
 	handler.HandleIDE(recStudent, reqStudent)
@@ -286,14 +366,27 @@ func TestHandleIDE_NavigationContextRendering(t *testing.T) {
 		t.Fatalf("HandleIDE student trả về %d", recStudent.Code)
 	}
 	bodyS := recStudent.Body.String()
-	if !strings.Contains(bodyS, `/lesson?id=12`) {
-		t.Errorf("Kỳ vọng body chứa link quay lại bài học /lesson?id=12")
+	if !strings.Contains(bodyS, `/lesson?id=1`) {
+		t.Errorf("Kỳ vọng body chứa link quay lại bài học /lesson?id=1")
 	}
 	if !strings.Contains(bodyS, `Quay lại Bài học`) {
 		t.Errorf("Kỳ vọng body chứa nhãn 'Quay lại Bài học'")
 	}
 	if !strings.Contains(bodyS, `Nguyen Van An`) {
 		t.Errorf("Kỳ vọng body chứa tên sinh viên 'Nguyen Van An'")
+	}
+
+	// 1b. Sinh viên vào IDE với lesson_id xung đột với course khác -> Fallback về course
+	reqConflict := httptest.NewRequest("GET", "/ide?mode=practice&course=PY101&lesson_id=99999", nil)
+	reqConflict = reqConflict.WithContext(auth.WithUser(reqConflict.Context(), studentUser))
+	recConflict := httptest.NewRecorder()
+	handler.HandleIDE(recConflict, reqConflict)
+	if recConflict.Code != 200 {
+		t.Fatalf("HandleIDE conflict trả về %d", recConflict.Code)
+	}
+	bodyConflict := recConflict.Body.String()
+	if strings.Contains(bodyConflict, `lesson_id=99999`) || strings.Contains(bodyConflict, `/lesson?id=99999`) {
+		t.Errorf("Ngữ cảnh bài học không tồn tại/xung đột không được xuất hiện trong BackURL")
 	}
 
 	// 2. Giảng viên vào IDE

@@ -83,10 +83,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    let autoSaveTimer = null;
-    let pendingSave = null;
+    // Quản lý trạng thái nháp và phòng chống mất mã nguồn
+    const lastSavedCodeByExercise = {};
+    if (currentExercise) {
+        lastSavedCodeByExercise[currentExercise.id] = currentExercise.initialCode || '';
+    }
 
-    // Phase 3: Snapshot ngay lập tức exerciseId và codeSnapshot khi kích hoạt autosave
+    let isSaving = false;
+    let pendingSave = null;
+    let autoSaveTimer = null;
+    let activeSavePromise = null;
+
+    function hasUnsavedChanges() {
+        if (!currentExercise || !codeEditor) return false;
+        const savedCode = lastSavedCodeByExercise[currentExercise.id];
+        if (savedCode === undefined) {
+            return (codeEditor.value || '') !== (currentExercise.initialCode || '');
+        }
+        return (codeEditor.value || '') !== savedCode;
+    }
+
+    // Snapshot ngay lập tức exerciseId và codeSnapshot khi kích hoạt autosave
     function triggerAutoSave() {
         if (!currentExercise) return;
         const exerciseId = currentExercise.id;
@@ -102,57 +119,78 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1500); // 1.5 giây debounce
     }
 
-    // Phase 3: Flush nháp đang chờ trước khi đổi câu hoặc nộp bài
+    async function executeSave(exerciseId, codeSnapshot) {
+        isSaving = true;
+        try {
+            const res = await fetch('/api/practice/save', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken()
+                },
+                body: JSON.stringify({ exercise_id: exerciseId, code: codeSnapshot })
+            });
+
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+
+            // Cập nhật snapshot đã lưu cho bài tập
+            lastSavedCodeByExercise[exerciseId] = codeSnapshot;
+
+            // Nếu người dùng chưa gõ thêm ký tự mới sau khi snapshot được gửi đi
+            if (currentExercise && currentExercise.id === exerciseId && codeEditor.value === codeSnapshot) {
+                setSaveStatus('saved');
+            }
+
+            if (data && data.status) {
+                updateExerciseBullet(exerciseId, data.status);
+            }
+            return true;
+        } catch (err) {
+            console.error('Lỗi tự động lưu:', err);
+            setSaveStatus('error');
+            return false;
+        } finally {
+            isSaving = false;
+        }
+    }
+
+    function saveDraftCode(exerciseId, code) {
+        activeSavePromise = executeSave(exerciseId, code);
+        return activeSavePromise;
+    }
+
+    // Flush nháp đang chờ trước khi đổi câu, rời trang hoặc nộp bài
     async function flushCurrentDraft() {
         if (autoSaveTimer) {
             clearTimeout(autoSaveTimer);
             autoSaveTimer = null;
         }
+
+        // Chờ request đang gửi nếu có
+        if (isSaving && activeSavePromise) {
+            await activeSavePromise;
+        }
+
+        // Kiểm tra nếu có thay đổi chưa lưu
+        if (currentExercise && hasUnsavedChanges()) {
+            const exerciseId = currentExercise.id;
+            const codeSnapshot = codeEditor.value;
+            pendingSave = null;
+            activeSavePromise = executeSave(exerciseId, codeSnapshot);
+            return await activeSavePromise;
+        }
+
+        // Nếu có pendingSave
         if (pendingSave && pendingSave.exerciseId) {
             const exerciseId = pendingSave.exerciseId;
-            const code = pendingSave.code;
+            const codeSnapshot = pendingSave.code;
             pendingSave = null;
-            try {
-                const res = await fetch('/api/practice/save', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': getCsrfToken()
-                    },
-                    body: JSON.stringify({ exercise_id: exerciseId, code: code })
-                });
-                if (res.ok) {
-                    setSaveStatus('saved');
-                }
-            } catch (err) {
-                console.error('Lỗi flush bản nháp:', err);
-            }
+            activeSavePromise = executeSave(exerciseId, codeSnapshot);
+            return await activeSavePromise;
         }
-    }
 
-    function saveDraftCode(exerciseId, code) {
-        fetch('/api/practice/save', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': getCsrfToken()
-            },
-            body: JSON.stringify({ exercise_id: exerciseId, code: code })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.json();
-        })
-        .then(data => {
-            setSaveStatus('saved');
-            if (data && data.status) {
-                updateExerciseBullet(exerciseId, data.status);
-            }
-        })
-        .catch(err => {
-            console.error('Lỗi tự động lưu:', err);
-            setSaveStatus('error');
-        });
+        return true;
     }
 
     function updateExerciseBullet(exerciseId, status) {
@@ -211,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (state && state.last_code && state.last_code.trim() !== '') {
                     codeEditor.value = state.last_code;
+                    lastSavedCodeByExercise[exerciseId] = state.last_code;
                     updateLineNumbers();
                     updateHighlighting();
                     const initial = currentExercise.initialCode || '';
@@ -219,6 +258,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         dirtyIndicator.style.display = 'none';
                     }
+                } else {
+                    lastSavedCodeByExercise[exerciseId] = currentExercise.initialCode || '';
                 }
                 if (state && state.status) {
                     updateExerciseBullet(exerciseId, state.status);
@@ -531,6 +572,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Đặt lại mã nguồn
         codeEditor.value = ex.initialCode || '';
+        lastSavedCodeByExercise[ex.id] = ex.initialCode || '';
         dirtyIndicator.style.display = 'none';
         updateLineNumbers();
         updateHighlighting();
@@ -753,6 +795,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             renderExerciseDetails(ex);
+
+            // Cập nhật nhãn exercise hiện tại trên breadcrumbs IDE (Phase 5: Breadcrumbs)
+            const breadcrumbCurrent = document.getElementById('ideCurrentBreadcrumb');
+            if (breadcrumbCurrent && ex && ex.title) {
+                breadcrumbCurrent.textContent = ex.title;
+            }
+
             if (execStatus) {
                 execStatus.textContent = "Sẵn sàng";
                 execStatus.style.color = "var(--text-muted)";
@@ -1088,4 +1137,83 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Tải toàn bộ trạng thái tiến độ luyện tập cho Sidebar (Phase 7)
     loadAllProgressStates();
+
+    // Phase 4: Bảo vệ mã nguồn chưa lưu khi rời trang (Leave Guard)
+    let isNavigatingAway = false;
+
+    async function handleSafeNavigation(targetUrl, formToSubmit) {
+        if (isNavigatingAway) return;
+
+        if (!hasUnsavedChanges()) {
+            isNavigatingAway = true;
+            if (formToSubmit) {
+                formToSubmit.submit();
+            } else if (targetUrl) {
+                window.location.href = targetUrl;
+            }
+            return;
+        }
+
+        setSaveStatus('saving');
+        const success = await flushCurrentDraft();
+        if (success) {
+            isNavigatingAway = true;
+            if (formToSubmit) {
+                formToSubmit.submit();
+            } else if (targetUrl) {
+                window.location.href = targetUrl;
+            }
+        } else {
+            const confirmLeave = confirm('Không thể lưu mã nguồn mới nhất lên máy chủ (mất mạng hoặc lỗi kết nối). Bạn có chắc chắn muốn rời trang và chấp nhận mất phần thay đổi chưa lưu?');
+            if (confirmLeave) {
+                isNavigatingAway = true;
+                if (formToSubmit) {
+                    formToSubmit.submit();
+                } else if (targetUrl) {
+                    window.location.href = targetUrl;
+                }
+            }
+        }
+    }
+
+    function setupNavigationGuard() {
+        // Gắn listener cho các nút Back, Home, liên kết menu compact
+        document.querySelectorAll('.btn-nav-back, .nav-compact-home, .compact-dropdown-content a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                // Cho phép mở tab mới bình thường (Ctrl, Meta, Shift, middle-click)
+                if (e.ctrlKey || e.metaKey || e.shiftKey || e.which === 2 || e.button === 1) {
+                    return;
+                }
+                const href = this.getAttribute('href');
+                if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+                    e.preventDefault();
+                    handleSafeNavigation(href, null);
+                }
+            });
+        });
+
+        // Form đăng xuất
+        const logoutForm = document.querySelector('.nav-compact-user form');
+        if (logoutForm) {
+            logoutForm.addEventListener('submit', function(e) {
+                if (isNavigatingAway) return;
+                if (hasUnsavedChanges()) {
+                    e.preventDefault();
+                    handleSafeNavigation(null, logoutForm);
+                }
+            });
+        }
+
+        // Cảnh báo trình duyệt đóng tab / reload / browser back khi còn thay đổi chưa lưu
+        window.addEventListener('beforeunload', function(e) {
+            if (!isNavigatingAway && hasUnsavedChanges()) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
+    }
+
+    setupNavigationGuard();
 });
+

@@ -359,6 +359,70 @@
     background-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Compact Breadcrumbs inside IDE Header */
+.nav-compact-breadcrumbs {
+    display: inline-flex;
+    align-items: center;
+    max-width: 380px;
+    overflow: hidden;
+    margin-left: 4px;
+}
+
+.compact-breadcrumb-list {
+    display: inline-flex;
+    align-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.compact-breadcrumb-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #6c7086;
+}
+
+.compact-breadcrumb-item a {
+    color: #a6adc8;
+    text-decoration: none;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+}
+
+.compact-breadcrumb-item a:hover {
+    color: #89b4fa;
+    text-decoration: underline;
+}
+
+.compact-breadcrumb-item.current span {
+    color: #cdd6f4;
+    font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.compact-breadcrumb-separator {
+    color: #6c7086;
+    user-select: none;
+    font-size: 11px;
+}
+
+@media (max-width: 900px) {
+    .nav-compact-breadcrumbs {
+        display: none;
+    }
+}
+
 .compact-dropdown {
     position: relative;
     display: inline-block;

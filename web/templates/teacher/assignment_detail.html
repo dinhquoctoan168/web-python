@@ -119,7 +119,7 @@
                             <strong>{{ .Points }}</strong> đ
                         </td>
                         <td style="text-align: center;">
-                            <a href="/ide?exercise_id={{ .ExerciseID }}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">
+                            <a href="/ide?mode=assignment&assignment_id={{ $.Assignment.ID }}&id={{ .ExerciseID }}" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">
                                 Xem trong IDE &nearr;
                             </a>
                         </td>
@@ -135,5 +135,6 @@
             </table>
         </div>
     </main>
+    <script src="/static/js/nav.js"></script>
 </body>
 </html>
