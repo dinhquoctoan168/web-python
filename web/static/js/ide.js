@@ -83,16 +83,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Quản lý trạng thái nháp và phòng chống mất mã nguồn
+    // --- QUẢN LÝ AUTOSAVE TUẦN TỰ (Sequential Single-Flight Save Worker) ---
     const lastSavedCodeByExercise = {};
     if (currentExercise) {
         lastSavedCodeByExercise[currentExercise.id] = currentExercise.initialCode || '';
     }
 
-    let isSaving = false;
-    let pendingSave = null;
+    let isWorkerRunning = false;
+    let pendingSnapshot = null; // { exerciseId, code }
+    let inFlightSnapshot = null; // { exerciseId, code } đang được gửi trên mạng
     let autoSaveTimer = null;
-    let activeSavePromise = null;
+    let lastSaveFailed = false;
+    let workerWaiters = []; // các promise resolver đang đợi worker lưu xong
 
     function hasUnsavedChanges() {
         if (!currentExercise || !codeEditor) return false;
@@ -103,94 +105,130 @@ document.addEventListener('DOMContentLoaded', function() {
         return (codeEditor.value || '') !== savedCode;
     }
 
-    // Snapshot ngay lập tức exerciseId và codeSnapshot khi kích hoạt autosave
-    function triggerAutoSave() {
+    function updateSaveStatusUI() {
         if (!currentExercise) return;
-        const exerciseId = currentExercise.id;
-        const codeSnapshot = codeEditor.value;
-
-        pendingSave = { exerciseId: exerciseId, code: codeSnapshot };
-        setSaveStatus('saving');
-
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(function() {
-            saveDraftCode(exerciseId, codeSnapshot);
-            pendingSave = null;
-        }, 1500); // 1.5 giây debounce
-    }
-
-    async function executeSave(exerciseId, codeSnapshot) {
-        isSaving = true;
-        try {
-            const res = await fetch('/api/practice/save', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': getCsrfToken()
-                },
-                body: JSON.stringify({ exercise_id: exerciseId, code: codeSnapshot })
-            });
-
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
-
-            // Cập nhật snapshot đã lưu cho bài tập
-            lastSavedCodeByExercise[exerciseId] = codeSnapshot;
-
-            // Nếu người dùng chưa gõ thêm ký tự mới sau khi snapshot được gửi đi
-            if (currentExercise && currentExercise.id === exerciseId && codeEditor.value === codeSnapshot) {
-                setSaveStatus('saved');
-            }
-
-            if (data && data.status) {
-                updateExerciseBullet(exerciseId, data.status);
-            }
-            return true;
-        } catch (err) {
-            console.error('Lỗi tự động lưu:', err);
+        if (lastSaveFailed) {
             setSaveStatus('error');
-            return false;
-        } finally {
-            isSaving = false;
+        } else if (isWorkerRunning || pendingSnapshot || autoSaveTimer) {
+            setSaveStatus('saving');
+        } else if (hasUnsavedChanges()) {
+            setSaveStatus('saving');
+        } else {
+            setSaveStatus('saved');
         }
     }
 
-    function saveDraftCode(exerciseId, code) {
-        activeSavePromise = executeSave(exerciseId, code);
-        return activeSavePromise;
+    // Đẩy một snapshot vào worker xử lý (có debounce hoặc lưu ngay)
+    function queueDraftSave(exerciseId, code, immediate = false) {
+        lastSaveFailed = false;
+        if (inFlightSnapshot && inFlightSnapshot.exerciseId === exerciseId && inFlightSnapshot.code === code && !pendingSnapshot) {
+            // Snapshot giống hệt đang bay trên mạng, không tạo pending trùng lặp
+        } else {
+            pendingSnapshot = { exerciseId, code };
+        }
+        updateSaveStatusUI();
+
+        if (autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
+
+        if (immediate) {
+            kickSaveWorker();
+        } else {
+            autoSaveTimer = setTimeout(function() {
+                autoSaveTimer = null;
+                kickSaveWorker();
+            }, 1500); // 1.5 giây debounce
+        }
     }
 
-    // Flush nháp đang chờ trước khi đổi câu, rời trang hoặc nộp bài
+    // Khi người dùng gõ vào khung soạn thảo
+    function triggerAutoSave() {
+        if (!currentExercise) return;
+        queueDraftSave(currentExercise.id, codeEditor.value, false);
+    }
+
+    // Vòng lặp worker xử lý tuần tự (Single-flight: không bao giờ chạy đồng thời)
+    async function kickSaveWorker() {
+        if (isWorkerRunning) return;
+        isWorkerRunning = true;
+        updateSaveStatusUI();
+
+        while (pendingSnapshot) {
+            const currentItem = pendingSnapshot;
+            pendingSnapshot = null;
+            inFlightSnapshot = currentItem;
+
+            try {
+                const res = await fetch('/api/practice/save', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': getCsrfToken()
+                    },
+                    body: JSON.stringify({ exercise_id: currentItem.exerciseId, code: currentItem.code })
+                });
+
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+
+                // Cập nhật mã nguồn đã được server xác nhận lưu thành công
+                lastSavedCodeByExercise[currentItem.exerciseId] = currentItem.code;
+                lastSaveFailed = false;
+
+                if (data && data.status) {
+                    updateExerciseBullet(currentItem.exerciseId, data.status);
+                }
+            } catch (err) {
+                console.error('Lỗi khi lưu nháp qua worker:', err);
+                lastSaveFailed = true;
+                // Nếu lưu thất bại và chưa có snapshot mới hơn được đẩy vào pendingSnapshot,
+                // khôi phục lại snapshot này để có thể retry
+                if (!pendingSnapshot) {
+                    pendingSnapshot = currentItem;
+                }
+                break;
+            } finally {
+                inFlightSnapshot = null;
+            }
+        }
+
+        isWorkerRunning = false;
+        updateSaveStatusUI();
+
+        // Thông báo cho toàn bộ các nơi đang chờ flushCurrentDraft
+        const waitersToNotify = workerWaiters;
+        workerWaiters = [];
+        waitersToNotify.forEach(resolve => resolve(!hasUnsavedChanges()));
+    }
+
+    // Flush toàn bộ thay đổi đang chờ và đợi worker xác nhận
     async function flushCurrentDraft() {
         if (autoSaveTimer) {
             clearTimeout(autoSaveTimer);
             autoSaveTimer = null;
         }
 
-        // Chờ request đang gửi nếu có
-        if (isSaving && activeSavePromise) {
-            await activeSavePromise;
-        }
-
-        // Kiểm tra nếu có thay đổi chưa lưu
+        // Đẩy snapshot hiện tại vào worker nếu có thay đổi và chưa trùng với snapshot đang bay
         if (currentExercise && hasUnsavedChanges()) {
-            const exerciseId = currentExercise.id;
-            const codeSnapshot = codeEditor.value;
-            pendingSave = null;
-            activeSavePromise = executeSave(exerciseId, codeSnapshot);
-            return await activeSavePromise;
+            const currentCode = codeEditor.value;
+            if (!inFlightSnapshot || inFlightSnapshot.code !== currentCode || inFlightSnapshot.exerciseId !== currentExercise.id) {
+                pendingSnapshot = { exerciseId: currentExercise.id, code: currentCode };
+            }
         }
 
-        // Nếu có pendingSave
-        if (pendingSave && pendingSave.exerciseId) {
-            const exerciseId = pendingSave.exerciseId;
-            const codeSnapshot = pendingSave.code;
-            pendingSave = null;
-            activeSavePromise = executeSave(exerciseId, codeSnapshot);
-            return await activeSavePromise;
+        // Nếu không có snapshot chờ và worker không chạy -> đã lưu xong
+        if (!pendingSnapshot && !isWorkerRunning) {
+            return !hasUnsavedChanges();
         }
 
-        return true;
+        const waitPromise = new Promise(resolve => {
+            workerWaiters.push(resolve);
+        });
+
+        kickSaveWorker();
+        return await waitPromise;
     }
 
     function updateExerciseBullet(exerciseId, status) {
@@ -755,7 +793,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 6. Tải bài tập khi người dùng bấm chọn (Phase 3 & 4)
     window.loadExercise = async function(id) {
-        await flushCurrentDraft();
+        // Không đổi bài nếu đang trong quá trình chuyển trang hoặc bấm lại chính bài đang mở
+        if (isNavigatingAway) return;
+        if (currentExercise && currentExercise.id === id) return;
+
+        // Lưu bản nháp của bài hiện tại trước khi đổi sang bài mới
+        if (hasUnsavedChanges()) {
+            setSaveStatus('saving');
+            const saved = await flushCurrentDraft();
+            if (!saved || hasUnsavedChanges()) {
+                alert('Không thể lưu mã nguồn bài tập hiện tại lên máy chủ (mất mạng hoặc lỗi kết nối). Vui lòng kiểm tra lại trước khi chuyển bài để không mất mã nguồn.');
+                return; // Giữ nguyên bài cũ, không nạp bài mới
+            }
+        } else {
+            await flushCurrentDraft();
+        }
 
         if (exerciseLoadController) {
             exerciseLoadController.abort();
@@ -1026,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateLineNumbers();
                 updateHighlighting();
                 dirtyIndicator.style.display = 'none';
-                saveDraftCode(currentExercise.id, initial);
+                queueDraftSave(currentExercise.id, initial, true);
             }
         }
     });
@@ -1143,9 +1195,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleSafeNavigation(targetUrl, formToSubmit) {
         if (isNavigatingAway) return;
+        isNavigatingAway = true;
+
+        // Khóa tạm thời khung soạn thảo để không bị gõ thêm trong lúc chuyển trang
+        if (codeEditor) codeEditor.readOnly = true;
 
         if (!hasUnsavedChanges()) {
-            isNavigatingAway = true;
             if (formToSubmit) {
                 formToSubmit.submit();
             } else if (targetUrl) {
@@ -1156,14 +1211,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setSaveStatus('saving');
         const success = await flushCurrentDraft();
-        if (success) {
-            isNavigatingAway = true;
+        if (success && !hasUnsavedChanges()) {
             if (formToSubmit) {
                 formToSubmit.submit();
             } else if (targetUrl) {
                 window.location.href = targetUrl;
             }
         } else {
+            // Mở lại khóa khung soạn thảo nếu lưu lỗi để người dùng tiếp tục sửa/retry
+            if (codeEditor) codeEditor.readOnly = false;
+            isNavigatingAway = false;
+
             const confirmLeave = confirm('Không thể lưu mã nguồn mới nhất lên máy chủ (mất mạng hoặc lỗi kết nối). Bạn có chắc chắn muốn rời trang và chấp nhận mất phần thay đổi chưa lưu?');
             if (confirmLeave) {
                 isNavigatingAway = true;
@@ -1177,8 +1235,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setupNavigationGuard() {
-        // Gắn listener cho các nút Back, Home, liên kết menu compact
-        document.querySelectorAll('.btn-nav-back, .nav-compact-home, .compact-dropdown-content a').forEach(link => {
+        // Gắn listener cho các nút Back, Home, liên kết menu compact và breadcrumbs
+        document.querySelectorAll('.btn-nav-back, .nav-compact-home, .compact-dropdown-content a, .compact-breadcrumb-item a').forEach(link => {
             link.addEventListener('click', function(e) {
                 // Cho phép mở tab mới bình thường (Ctrl, Meta, Shift, middle-click)
                 if (e.ctrlKey || e.metaKey || e.shiftKey || e.which === 2 || e.button === 1) {

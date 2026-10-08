@@ -315,7 +315,7 @@ func BuildValidatedIDEContext(user *auth.User, mode string, asgn *assignment.Ass
 			BackLabel: "Quay lại Bài tập",
 			Breadcrumbs: []frontend.Breadcrumb{
 				{Label: "Trang chủ", URL: "/dashboard"},
-				{Label: "Bài tập", URL: "/assignments"},
+				{Label: "Bài tập", URL: "/my-assignments"},
 				{Label: asgn.Title, URL: fmt.Sprintf("/assignment?id=%d", asgn.ID)},
 				{Label: exTitle, URL: ""},
 			},

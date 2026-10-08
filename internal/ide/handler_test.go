@@ -297,6 +297,9 @@ func TestBuildValidatedIDEContext(t *testing.T) {
 	if len(ctxAsgnS.Breadcrumbs) != 4 || ctxAsgnS.Breadcrumbs[2].Label != "Bài tập Tuần 1" {
 		t.Errorf("Breadcrumbs không khớp cho student assignment: %+v", ctxAsgnS.Breadcrumbs)
 	}
+	if ctxAsgnS.Breadcrumbs[1].URL != "/my-assignments" {
+		t.Errorf("Kỳ vọng student assignment list URL là /my-assignments, nhận %s", ctxAsgnS.Breadcrumbs[1].URL)
+	}
 
 	// 2. Assignment mode for teacher
 	ctxAsgnT := BuildValidatedIDEContext(teacherUser, "assignment", asgn, nil, sampleCourse, false, sampleEx)
@@ -305,6 +308,9 @@ func TestBuildValidatedIDEContext(t *testing.T) {
 	}
 	if len(ctxAsgnT.Breadcrumbs) != 4 || ctxAsgnT.Breadcrumbs[2].Label != "Bài tập Tuần 1" {
 		t.Errorf("Breadcrumbs không khớp cho teacher assignment: %+v", ctxAsgnT.Breadcrumbs)
+	}
+	if ctxAsgnT.Breadcrumbs[1].URL != "/teacher/assignments" {
+		t.Errorf("Kỳ vọng teacher assignment list URL là /teacher/assignments, nhận %s", ctxAsgnT.Breadcrumbs[1].URL)
 	}
 
 	// 3. Lesson context
