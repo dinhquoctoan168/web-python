@@ -193,17 +193,39 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    function showDraftLoadError(exerciseId, msg) {
+        if (saveStatus) {
+            saveStatus.className = 'save-status error';
+            saveStatus.innerHTML = `&#9888; Lỗi nạp nháp (<a href="javascript:void(0)" id="btnRetryDraft-${exerciseId}" onclick="retryLoadDraft(${exerciseId})" style="color:inherit; text-decoration:underline; font-weight:600;">Thử lại</a>)`;
+        }
+    }
+
+    window.retryLoadDraft = async function(exerciseId) {
+        if (!currentExercise || currentExercise.id !== exerciseId) return;
+        if (saveManager) {
+            return await saveManager.retryLoadDraft(exerciseId, (id, gen) => loadSavedDraft(id, gen));
+        } else {
+            return await loadSavedDraft(exerciseId);
+        }
+    };
+
     // Phase 3: Ngăn chặn race condition khi nạp bản nháp
-    async function loadSavedDraft(exerciseId) {
+    async function loadSavedDraft(exerciseId, generation) {
         try {
             const res = await fetch(`/api/practice/state?exercise_id=${exerciseId}`);
-            if (!res.ok) return null;
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
             const state = await res.json();
 
-            // Kiểm tra người dùng có còn ở đúng bài tập này hay đã chuyển bài
-            if (!currentExercise || currentExercise.id !== exerciseId) {
-                return null;
+            // Kiểm tra người dùng có còn ở đúng bài tập này hay generation hiện tại hay không
+            if (saveManager && generation !== undefined && generation !== saveManager.currentGeneration) {
+                return { ok: false, discarded: true };
             }
+            if (!currentExercise || currentExercise.id !== exerciseId) {
+                return { ok: false, discarded: true };
+            }
+
             if (state && state.last_code && state.last_code.trim() !== '') {
                 codeEditor.value = state.last_code;
                 if (saveManager) saveManager.setLastSavedCode(exerciseId, state.last_code);
@@ -222,10 +244,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateExerciseBullet(exerciseId, state.status);
             }
             setSaveStatus('saved');
-            return state;
+            return { ok: true, code: state ? state.last_code : '', state: state };
         } catch (err) {
             console.error('Lỗi lấy tiến độ bài tập:', err);
-            return null;
+            // KHÔNG coi lỗi API là "không có draft", KHÔNG hiển thị "Đã lưu" sai
+            setSaveStatus('error');
+            showDraftLoadError(exerciseId, err.message);
+            return { ok: false, error: err };
         }
     }
 
@@ -728,6 +753,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (saveManager && !saveManager.startTransition()) return;
 
+        const gen = saveManager ? saveManager.getNextGeneration() : 0;
+
         try {
             // Lưu bản nháp của bài hiện tại trước khi đổi sang bài mới
             if (hasUnconfirmedDrafts()) {
@@ -778,7 +805,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderExerciseDetails(ex);
 
             // Nạp bản nháp đã lưu của bài mới trong khi editor vẫn bị khóa
-            await loadSavedDraft(ex.id);
+            await loadSavedDraft(ex.id, gen);
 
             // Cập nhật nhãn exercise hiện tại trên breadcrumbs IDE (Phase 5: Breadcrumbs)
             const breadcrumbCurrent = document.getElementById('ideCurrentBreadcrumb');
@@ -1121,10 +1148,28 @@ document.addEventListener('DOMContentLoaded', function() {
     applyFontSize(currentFontSize);
 
 
-    // Khởi tạo bài tập đầu tiên
+    // Khởi tạo bài tập đầu tiên bất đồng bộ dưới transition guard
+    async function initInitialExercise(initialEx) {
+        if (!initialEx) return;
+        if (saveManager) {
+            await saveManager.initExercise(initialEx, {
+                render: (ex) => {
+                    renderExerciseDetails(ex);
+                    updateLineNumbers();
+                },
+                fetchDraft: async (id, gen) => {
+                    return await loadSavedDraft(id, gen);
+                }
+            });
+        } else {
+            renderExerciseDetails(initialEx);
+            updateLineNumbers();
+            await loadSavedDraft(initialEx.id);
+        }
+    }
+
     if (window.INITIAL_EXERCISE) {
-        renderExerciseDetails(window.INITIAL_EXERCISE);
-        loadSavedDraft(window.INITIAL_EXERCISE.id);
+        initInitialExercise(window.INITIAL_EXERCISE);
     }
     updateLineNumbers();
 

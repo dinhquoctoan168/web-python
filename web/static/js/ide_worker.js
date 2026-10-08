@@ -294,6 +294,108 @@
             updateSaveStatusUI();
         }
 
+        let currentGeneration = 0;
+
+        function getNextGeneration() {
+            return ++currentGeneration;
+        }
+
+        async function initExercise(exercise, handlers = {}) {
+            if (!exercise) return null;
+            if (!startTransition()) return null;
+
+            const generation = ++currentGeneration;
+
+            try {
+                if (typeof handlers.render === 'function') {
+                    handlers.render(exercise);
+                } else {
+                    setExercise(exercise);
+                }
+
+                if (typeof handlers.fetchDraft === 'function') {
+                    const res = await handlers.fetchDraft(exercise.id, generation);
+                    // Bỏ qua nếu thế hệ không còn khớp (stale response)
+                    if (generation !== currentGeneration) {
+                        return { discarded: true };
+                    }
+                    if (res && res.ok) {
+                        if (res.code !== undefined && res.code !== null && res.code.trim() !== '') {
+                            setEditorValueFn(res.code);
+                            setLastSavedCode(exercise.id, res.code);
+                        } else {
+                            setLastSavedCode(exercise.id, exercise.initialCode || '');
+                        }
+                        lastSaveFailed = false;
+                        saveStatus = 'saved';
+                        onStatusChange(saveStatus);
+                        return { ok: true, code: res.code };
+                    } else if (res && !res.ok) {
+                        lastSaveFailed = true;
+                        saveStatus = 'error';
+                        onStatusChange(saveStatus);
+                        return { ok: false, error: res.error || new Error('Draft load failed') };
+                    }
+                }
+                return { ok: true };
+            } catch (err) {
+                if (generation === currentGeneration) {
+                    lastSaveFailed = true;
+                    saveStatus = 'error';
+                    onStatusChange(saveStatus);
+                }
+                return { ok: false, error: err };
+            } finally {
+                endTransition();
+            }
+        }
+
+        async function retryLoadDraft(exerciseId, fetchDraft) {
+            const ex = getCurrentExerciseFn();
+            if (!ex || ex.id !== exerciseId) return null;
+            if (!startTransition()) return null;
+
+            const generation = ++currentGeneration;
+            saveStatus = 'saving';
+            onStatusChange(saveStatus);
+
+            try {
+                if (typeof fetchDraft === 'function') {
+                    const res = await fetchDraft(exerciseId, generation);
+                    if (generation !== currentGeneration) {
+                        return { discarded: true };
+                    }
+                    if (res && res.ok) {
+                        if (res.code !== undefined && res.code !== null && res.code.trim() !== '') {
+                            setEditorValueFn(res.code);
+                            setLastSavedCode(exerciseId, res.code);
+                        } else {
+                            setLastSavedCode(exerciseId, ex.initialCode || '');
+                        }
+                        lastSaveFailed = false;
+                        saveStatus = 'saved';
+                        onStatusChange(saveStatus);
+                        return { ok: true, code: res.code };
+                    } else {
+                        lastSaveFailed = true;
+                        saveStatus = 'error';
+                        onStatusChange(saveStatus);
+                        return { ok: false, error: (res && res.error) || new Error('Draft retry failed') };
+                    }
+                }
+                return { ok: true };
+            } catch (err) {
+                if (generation === currentGeneration) {
+                    lastSaveFailed = true;
+                    saveStatus = 'error';
+                    onStatusChange(saveStatus);
+                }
+                return { ok: false, error: err };
+            } finally {
+                endTransition();
+            }
+        }
+
         return {
             get editorValue() { return getEditorValueFn(); },
             set editorValue(v) { setEditorValueFn(v); editorValue = v; updateSaveStatusUI(); },
@@ -310,7 +412,11 @@
             get transitionInProgress() { return transitionInProgress; },
             get allowUnload() { return allowUnload; },
             set allowUnload(v) { allowUnload = v; },
+            get currentGeneration() { return currentGeneration; },
 
+            getNextGeneration,
+            initExercise,
+            retryLoadDraft,
             getLastSavedCode,
             setLastSavedCode,
             hasUnsavedChanges,

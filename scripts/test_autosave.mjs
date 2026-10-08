@@ -461,3 +461,221 @@ test('10. Double-click / link / logout cạnh tranh: Chỉ một transition đư
     assert.equal(await nav1Promise, true, 'Thao tác điều hướng đầu tiên hoàn thành');
     assert.equal(navCount, 1, 'Chỉ thực hiện điều hướng đúng 1 lần');
 });
+
+test('11. Khởi tạo exercise đầu tiên khi request draft đang chạy: Editor và thao tác đổi code bị khóa', async () => {
+    let editorVal = '';
+    let readOnlyState = false;
+    let currentEx = null;
+
+    const saveManager = createSaveManager({
+        initialExercise: null,
+        initialCode: '',
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx
+    });
+
+    const draftDeferred = createDeferred();
+
+    const ex1 = { id: 101, initialCode: 'print("ex101_init")' };
+    const initPromise = saveManager.initExercise(ex1, {
+        render: (ex) => {
+            currentEx = ex;
+            editorVal = ex.initialCode;
+        },
+        fetchDraft: async () => draftDeferred.promise
+    });
+
+    await new Promise(r => setTimeout(r, 5));
+
+    // Trong khi draft request đang bay:
+    assert.equal(saveManager.isTransitionInProgress(), true, 'Transition lock phải bật khi đang khởi tạo');
+    assert.equal(readOnlyState, true, 'Editor phải ở chế độ readOnly');
+
+    // Chặn reset
+    function tryReset() {
+        if (saveManager.isTransitionInProgress()) return false;
+        editorVal = currentEx.initialCode;
+        return true;
+    }
+    assert.equal(tryReset(), false, 'Reset code phải bị chặn');
+
+    // Chặn transition cạnh tranh
+    assert.equal(saveManager.startTransition(), false, 'Không được phép bắt đầu transition cạnh tranh');
+
+    draftDeferred.resolve({ ok: true, code: 'print("ex101_draft")' });
+    await initPromise;
+});
+
+test('12. Draft trả về thành công: Nạp đúng nội dung rồi mới mở khóa', async () => {
+    let editorVal = '';
+    let readOnlyState = false;
+    let currentEx = null;
+
+    const saveManager = createSaveManager({
+        initialExercise: null,
+        initialCode: '',
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx
+    });
+
+    const ex = { id: 202, initialCode: 'print("init_202")' };
+    const res = await saveManager.initExercise(ex, {
+        render: (e) => {
+            currentEx = e;
+            editorVal = e.initialCode;
+        },
+        fetchDraft: async () => ({ ok: true, code: 'print("loaded_draft_202")' })
+    });
+
+    assert.equal(res.ok, true);
+    assert.equal(editorVal, 'print("loaded_draft_202")', 'Mã nguồn editor phải là bản nháp đã nạp');
+    assert.equal(saveManager.getLastSavedCode(202), 'print("loaded_draft_202")', 'Mã đã lưu phải khớp draft');
+    assert.equal(readOnlyState, false, 'Editor phải được mở khóa sau khi nạp xong');
+    assert.equal(saveManager.isTransitionInProgress(), false, 'Transition lock đã được giải phóng');
+    assert.equal(saveManager.saveStatus, 'saved', 'Trạng thái lưu là saved');
+});
+
+test('13. Request draft lỗi: Xử lý đúng trạng thái error, mở khóa an toàn và cho phép retry', async () => {
+    let editorVal = '';
+    let readOnlyState = false;
+    let currentEx = null;
+
+    const saveManager = createSaveManager({
+        initialExercise: null,
+        initialCode: '',
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx
+    });
+
+    const ex = { id: 303, initialCode: 'print("init_303")' };
+    const res = await saveManager.initExercise(ex, {
+        render: (e) => {
+            currentEx = e;
+            editorVal = e.initialCode;
+        },
+        fetchDraft: async () => ({ ok: false, error: new Error('HTTP 500 Internal Server Error') })
+    });
+
+    assert.equal(res.ok, false, 'initExercise phải báo lỗi');
+    assert.equal(saveManager.saveStatus, 'error', 'Trạng thái UI phải là error (không được báo saved)');
+    assert.equal(readOnlyState, false, 'Editor không bị khóa vĩnh viễn');
+    assert.equal(saveManager.isTransitionInProgress(), false, 'Transition lock được giải phóng sau lỗi');
+
+    // Thử lại (retry) thành công
+    const retryRes = await saveManager.retryLoadDraft(303, async () => ({
+        ok: true,
+        code: 'print("recovered_draft_303")'
+    }));
+
+    assert.equal(retryRes.ok, true, 'Retry nạp draft thành công');
+    assert.equal(editorVal, 'print("recovered_draft_303")', 'Mã nguồn editor được khôi phục');
+    assert.equal(saveManager.saveStatus, 'saved', 'Trạng thái chuyển sang saved');
+    assert.equal(readOnlyState, false, 'Editor mở khóa sau retry');
+});
+
+test('14. Response cũ (stale response): Không ghi đè exercise hiện tại', async () => {
+    let editorVal = '';
+    let readOnlyState = false;
+    let currentEx = null;
+
+    const saveManager = createSaveManager({
+        initialExercise: null,
+        initialCode: '',
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx
+    });
+
+    const draftDeferred1 = createDeferred();
+    const ex1 = { id: 1, initialCode: 'init_1' };
+
+    // Khởi tạo bài 1 (request draft bị treo)
+    const init1Promise = saveManager.initExercise(ex1, {
+        render: (e) => { currentEx = e; editorVal = e.initialCode; },
+        fetchDraft: async () => draftDeferred1.promise
+    });
+
+    await new Promise(r => setTimeout(r, 5));
+
+    // Người dùng chuyển sang bài 2
+    saveManager.endTransition(); // giải phóng để bài 2 chạy
+    const ex2 = { id: 2, initialCode: 'init_2' };
+    await saveManager.initExercise(ex2, {
+        render: (e) => { currentEx = e; editorVal = e.initialCode; },
+        fetchDraft: async () => ({ ok: true, code: 'draft_2_active' })
+    });
+
+    assert.equal(editorVal, 'draft_2_active', 'Editor đang hiển thị draft bài 2');
+
+    // Lúc này response của bài 1 mới về (stale response)
+    draftDeferred1.resolve({ ok: true, code: 'stale_draft_1' });
+    const res1 = await init1Promise;
+
+    assert.equal(res1.discarded, true, 'Response cũ phải bị đánh dấu discarded');
+    assert.equal(editorVal, 'draft_2_active', 'Editor KHÔNG bị response cũ của bài 1 ghi đè');
+    assert.equal(currentEx.id, 2, 'Context vẫn là bài 2');
+});
+
+test('15. Luồng loadExercise() giữ khóa xuyên suốt cho đến khi nạp xong draft', async () => {
+    let editorVal = 'code_A';
+    let readOnlyState = false;
+    let currentEx = { id: 1, initialCode: 'code_A' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx,
+        apiSave: async () => ({ ok: true, status: 200 })
+    });
+
+    const draftDeferredB = createDeferred();
+
+    async function loadExerciseWithDraft(targetEx) {
+        if (!saveManager.startTransition()) return false;
+        const gen = saveManager.getNextGeneration();
+        try {
+            // Render bài mới
+            currentEx = targetEx;
+            editorVal = targetEx.initialCode;
+
+            // Chờ draft nạp xong TRƯỚC KHI mở khóa
+            const draftRes = await draftDeferredB.promise;
+            if (gen === saveManager.currentGeneration && draftRes.ok) {
+                editorVal = draftRes.code;
+                saveManager.setLastSavedCode(targetEx.id, draftRes.code);
+            }
+            return true;
+        } finally {
+            saveManager.endTransition();
+        }
+    }
+
+    const loadPromise = loadExerciseWithDraft({ id: 2, initialCode: 'init_B' });
+    await new Promise(r => setTimeout(r, 5));
+
+    // Trong khi draft bài B đang tải
+    assert.equal(saveManager.isTransitionInProgress(), true, 'Khóa transition phải bật');
+    assert.equal(readOnlyState, true, 'Editor phải khóa trong suốt quá trình');
+
+    draftDeferredB.resolve({ ok: true, code: 'draft_B_final' });
+    await loadPromise;
+
+    assert.equal(saveManager.isTransitionInProgress(), false, 'Khóa mở sau khi hoàn tất');
+    assert.equal(readOnlyState, false, 'Editor mở lại');
+    assert.equal(editorVal, 'draft_B_final', 'Mã nguồn là draft B');
+});
