@@ -83,152 +83,72 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- QUẢN LÝ AUTOSAVE TUẦN TỰ (Sequential Single-Flight Save Worker) ---
-    const lastSavedCodeByExercise = {};
-    if (currentExercise) {
-        lastSavedCodeByExercise[currentExercise.id] = currentExercise.initialCode || '';
-    }
-
-    let isWorkerRunning = false;
-    let pendingSnapshot = null; // { exerciseId, code }
-    let inFlightSnapshot = null; // { exerciseId, code } đang được gửi trên mạng
-    let autoSaveTimer = null;
-    let lastSaveFailed = false;
-    let workerWaiters = []; // các promise resolver đang đợi worker lưu xong
-
-    function hasUnsavedChanges() {
-        if (!currentExercise || !codeEditor) return false;
-        const savedCode = lastSavedCodeByExercise[currentExercise.id];
-        if (savedCode === undefined) {
-            return (codeEditor.value || '') !== (currentExercise.initialCode || '');
-        }
-        return (codeEditor.value || '') !== savedCode;
-    }
-
-    function updateSaveStatusUI() {
-        if (!currentExercise) return;
-        if (lastSaveFailed) {
-            setSaveStatus('error');
-        } else if (isWorkerRunning || pendingSnapshot || autoSaveTimer) {
-            setSaveStatus('saving');
-        } else if (hasUnsavedChanges()) {
-            setSaveStatus('saving');
-        } else {
-            setSaveStatus('saved');
-        }
-    }
-
-    // Đẩy một snapshot vào worker xử lý (có debounce hoặc lưu ngay)
-    function queueDraftSave(exerciseId, code, immediate = false) {
-        lastSaveFailed = false;
-        if (inFlightSnapshot && inFlightSnapshot.exerciseId === exerciseId && inFlightSnapshot.code === code && !pendingSnapshot) {
-            // Snapshot giống hệt đang bay trên mạng, không tạo pending trùng lặp
-        } else {
-            pendingSnapshot = { exerciseId, code };
-        }
-        updateSaveStatusUI();
-
-        if (autoSaveTimer) {
-            clearTimeout(autoSaveTimer);
-            autoSaveTimer = null;
-        }
-
-        if (immediate) {
-            kickSaveWorker();
-        } else {
-            autoSaveTimer = setTimeout(function() {
-                autoSaveTimer = null;
-                kickSaveWorker();
-            }, 1500); // 1.5 giây debounce
-        }
-    }
-
-    // Khi người dùng gõ vào khung soạn thảo
-    function triggerAutoSave() {
-        if (!currentExercise) return;
-        queueDraftSave(currentExercise.id, codeEditor.value, false);
-    }
-
-    // Vòng lặp worker xử lý tuần tự (Single-flight: không bao giờ chạy đồng thời)
-    async function kickSaveWorker() {
-        if (isWorkerRunning) return;
-        isWorkerRunning = true;
-        updateSaveStatusUI();
-
-        while (pendingSnapshot) {
-            const currentItem = pendingSnapshot;
-            pendingSnapshot = null;
-            inFlightSnapshot = currentItem;
-
-            try {
+    // --- QUẢN LÝ AUTOSAVE TUẦN TỰ & TRANSITION GUARD (Module IdeSaveWorker) ---
+    const saveManager = (window.IdeSaveWorker && window.IdeSaveWorker.createSaveManager)
+        ? window.IdeSaveWorker.createSaveManager({
+            initialExercise: currentExercise,
+            initialCode: currentExercise ? (currentExercise.initialCode || '') : '',
+            getEditorValue: () => (codeEditor ? codeEditor.value : ''),
+            setEditorValue: (val) => { if (codeEditor) codeEditor.value = val; },
+            setReadOnly: (ro) => { if (codeEditor) codeEditor.readOnly = ro; },
+            isReadOnly: () => (codeEditor ? codeEditor.readOnly : false),
+            getCurrentExercise: () => currentExercise,
+            onStatusChange: (status) => setSaveStatus(status),
+            onExerciseStatusUpdate: (exerciseId, status) => updateExerciseBullet(exerciseId, status),
+            apiSave: async (exerciseId, code) => {
                 const res = await fetch('/api/practice/save', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
                         'X-CSRF-Token': getCsrfToken()
                     },
-                    body: JSON.stringify({ exercise_id: currentItem.exerciseId, code: currentItem.code })
+                    body: JSON.stringify({ exercise_id: exerciseId, code: code })
                 });
-
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
-
-                // Cập nhật mã nguồn đã được server xác nhận lưu thành công
-                lastSavedCodeByExercise[currentItem.exerciseId] = currentItem.code;
-                lastSaveFailed = false;
-
-                if (data && data.status) {
-                    updateExerciseBullet(currentItem.exerciseId, data.status);
+                return { ok: true, status: res.status, data: data };
+            },
+            onNavigate: (targetUrl, form) => {
+                if (form) {
+                    form.submit();
+                } else if (targetUrl) {
+                    window.location.href = targetUrl;
                 }
-            } catch (err) {
-                console.error('Lỗi khi lưu nháp qua worker:', err);
-                lastSaveFailed = true;
-                // Nếu lưu thất bại và chưa có snapshot mới hơn được đẩy vào pendingSnapshot,
-                // khôi phục lại snapshot này để có thể retry
-                if (!pendingSnapshot) {
-                    pendingSnapshot = currentItem;
-                }
-                break;
-            } finally {
-                inFlightSnapshot = null;
-            }
-        }
+            },
+            confirmLeave: (msg) => confirm(msg)
+        })
+        : null;
 
-        isWorkerRunning = false;
-        updateSaveStatusUI();
-
-        // Thông báo cho toàn bộ các nơi đang chờ flushCurrentDraft
-        const waitersToNotify = workerWaiters;
-        workerWaiters = [];
-        waitersToNotify.forEach(resolve => resolve(!hasUnsavedChanges()));
+    function hasUnsavedChanges() {
+        return saveManager ? saveManager.hasUnsavedChanges() : false;
     }
 
-    // Flush toàn bộ thay đổi đang chờ và đợi worker xác nhận
+    function hasUnconfirmedDrafts() {
+        return saveManager ? saveManager.hasUnconfirmedDrafts() : false;
+    }
+
+    function updateSaveStatusUI() {
+        if (saveManager) {
+            saveManager.updateSaveStatusUI();
+        }
+    }
+
+    function queueDraftSave(exerciseId, code, immediate = false) {
+        if (saveManager) {
+            saveManager.queueDraftSave(exerciseId, code, immediate);
+        }
+    }
+
+    function triggerAutoSave() {
+        if (!currentExercise || !codeEditor) return;
+        queueDraftSave(currentExercise.id, codeEditor.value, false);
+    }
+
     async function flushCurrentDraft() {
-        if (autoSaveTimer) {
-            clearTimeout(autoSaveTimer);
-            autoSaveTimer = null;
+        if (saveManager) {
+            return await saveManager.flushCurrentDraft();
         }
-
-        // Đẩy snapshot hiện tại vào worker nếu có thay đổi và chưa trùng với snapshot đang bay
-        if (currentExercise && hasUnsavedChanges()) {
-            const currentCode = codeEditor.value;
-            if (!inFlightSnapshot || inFlightSnapshot.code !== currentCode || inFlightSnapshot.exerciseId !== currentExercise.id) {
-                pendingSnapshot = { exerciseId: currentExercise.id, code: currentCode };
-            }
-        }
-
-        // Nếu không có snapshot chờ và worker không chạy -> đã lưu xong
-        if (!pendingSnapshot && !isWorkerRunning) {
-            return !hasUnsavedChanges();
-        }
-
-        const waitPromise = new Promise(resolve => {
-            workerWaiters.push(resolve);
-        });
-
-        kickSaveWorker();
-        return await waitPromise;
+        return true;
     }
 
     function updateExerciseBullet(exerciseId, status) {
@@ -274,39 +194,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Phase 3: Ngăn chặn race condition khi nạp bản nháp
-    function loadSavedDraft(exerciseId) {
-        fetch(`/api/practice/state?exercise_id=${exerciseId}`)
-            .then(res => {
-                if (!res.ok) return null;
-                return res.json();
-            })
-            .then(state => {
-                // Kiểm tra người dùng có còn ở đúng bài tập này hay đã chuyển bài
-                if (!currentExercise || currentExercise.id !== exerciseId) {
-                    return;
-                }
-                if (state && state.last_code && state.last_code.trim() !== '') {
-                    codeEditor.value = state.last_code;
-                    lastSavedCodeByExercise[exerciseId] = state.last_code;
-                    updateLineNumbers();
-                    updateHighlighting();
-                    const initial = currentExercise.initialCode || '';
-                    if (state.last_code !== initial) {
-                        dirtyIndicator.style.display = 'inline';
-                    } else {
-                        dirtyIndicator.style.display = 'none';
-                    }
+    async function loadSavedDraft(exerciseId) {
+        try {
+            const res = await fetch(`/api/practice/state?exercise_id=${exerciseId}`);
+            if (!res.ok) return null;
+            const state = await res.json();
+
+            // Kiểm tra người dùng có còn ở đúng bài tập này hay đã chuyển bài
+            if (!currentExercise || currentExercise.id !== exerciseId) {
+                return null;
+            }
+            if (state && state.last_code && state.last_code.trim() !== '') {
+                codeEditor.value = state.last_code;
+                if (saveManager) saveManager.setLastSavedCode(exerciseId, state.last_code);
+                updateLineNumbers();
+                updateHighlighting();
+                const initial = currentExercise.initialCode || '';
+                if (state.last_code !== initial) {
+                    dirtyIndicator.style.display = 'inline';
                 } else {
-                    lastSavedCodeByExercise[exerciseId] = currentExercise.initialCode || '';
+                    dirtyIndicator.style.display = 'none';
                 }
-                if (state && state.status) {
-                    updateExerciseBullet(exerciseId, state.status);
-                }
-                setSaveStatus('saved');
-            })
-            .catch(err => {
-                console.error('Lỗi lấy tiến độ bài tập:', err);
-            });
+            } else {
+                if (saveManager) saveManager.setLastSavedCode(exerciseId, currentExercise.initialCode || '');
+            }
+            if (state && state.status) {
+                updateExerciseBullet(exerciseId, state.status);
+            }
+            setSaveStatus('saved');
+            return state;
+        } catch (err) {
+            console.error('Lỗi lấy tiến độ bài tập:', err);
+            return null;
+        }
     }
 
     function submitPracticeResult(exerciseId, code, score, passed) {
@@ -433,6 +353,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     codeEditor.addEventListener('input', function() {
+        if (this.readOnly || (saveManager && saveManager.isTransitionInProgress())) {
+            return;
+        }
         updateLineNumbers();
         updateHighlighting();
         if (currentExercise && codeEditor.value !== currentExercise.initialCode) {
@@ -453,6 +376,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Xử lý phím Tab (4 dấu cách) và phím Enter (giữ lề)
     codeEditor.addEventListener('keydown', function(e) {
+        if (this.readOnly || (saveManager && saveManager.isTransitionInProgress())) {
+            if (e.key === 'Tab' || e.key === 'Enter') {
+                e.preventDefault();
+            }
+            return;
+        }
         if (e.key === 'Tab') {
             e.preventDefault();
             const start = this.selectionStart;
@@ -610,7 +539,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Đặt lại mã nguồn
         codeEditor.value = ex.initialCode || '';
-        lastSavedCodeByExercise[ex.id] = ex.initialCode || '';
+        if (saveManager) {
+            saveManager.setLastSavedCode(ex.id, ex.initialCode || '');
+        }
         dirtyIndicator.style.display = 'none';
         updateLineNumbers();
         updateHighlighting();
@@ -646,9 +577,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 editorBody.style.display = 'flex';
             }
         }
-
-        // Nạp bản nháp đã lưu của học viên từ server (nếu có)
-        loadSavedDraft(ex.id);
     };
 
     // Phase 13: Tải các lựa chọn trắc nghiệm từ API bảo mật (tuyệt đối không lộ đáp án đúng)
@@ -700,6 +628,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     window.submitQuizChoice = function() {
+        if (saveManager && saveManager.isTransitionInProgress()) return;
         if (!currentExercise) return;
         const selectedRadio = document.querySelector('input[name="quizOption"]:checked');
         const msgEl = document.getElementById('quizResultMsg');
@@ -793,30 +722,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 6. Tải bài tập khi người dùng bấm chọn (Phase 3 & 4)
     window.loadExercise = async function(id) {
-        // Không đổi bài nếu đang trong quá trình chuyển trang hoặc bấm lại chính bài đang mở
-        if (isNavigatingAway) return;
+        // Không đổi bài nếu đang trong quá trình chuyển trang hoặc transition khác, hoặc bấm lại chính bài đang mở
+        if (saveManager && saveManager.isTransitionInProgress()) return;
         if (currentExercise && currentExercise.id === id) return;
 
-        // Lưu bản nháp của bài hiện tại trước khi đổi sang bài mới
-        if (hasUnsavedChanges()) {
-            setSaveStatus('saving');
-            const saved = await flushCurrentDraft();
-            if (!saved || hasUnsavedChanges()) {
-                alert('Không thể lưu mã nguồn bài tập hiện tại lên máy chủ (mất mạng hoặc lỗi kết nối). Vui lòng kiểm tra lại trước khi chuyển bài để không mất mã nguồn.');
-                return; // Giữ nguyên bài cũ, không nạp bài mới
-            }
-        } else {
-            await flushCurrentDraft();
-        }
-
-        if (exerciseLoadController) {
-            exerciseLoadController.abort();
-        }
-        exerciseLoadController = new AbortController();
-
-        showExerciseLoading(id);
+        if (saveManager && !saveManager.startTransition()) return;
 
         try {
+            // Lưu bản nháp của bài hiện tại trước khi đổi sang bài mới
+            if (hasUnconfirmedDrafts()) {
+                setSaveStatus('saving');
+                const saved = await flushCurrentDraft();
+                if (!saved || hasUnconfirmedDrafts()) {
+                    alert('Không thể lưu mã nguồn bài tập hiện tại lên máy chủ (mất mạng hoặc lỗi kết nối). Vui lòng kiểm tra lại trước khi chuyển bài để không mất mã nguồn.');
+                    return; // Giữ nguyên bài cũ, không nạp bài mới
+                }
+            }
+
+            if (exerciseLoadController) {
+                exerciseLoadController.abort();
+            }
+            exerciseLoadController = new AbortController();
+
+            showExerciseLoading(id);
+
             let fetchUrl = `/api/exercise?id=${id}`;
             if (window.IDE_CONTEXT && window.IDE_CONTEXT.mode === 'assignment' && window.IDE_CONTEXT.assignmentId) {
                 fetchUrl += `&assignment_id=${window.IDE_CONTEXT.assignmentId}`;
@@ -848,6 +777,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             renderExerciseDetails(ex);
 
+            // Nạp bản nháp đã lưu của bài mới trong khi editor vẫn bị khóa
+            await loadSavedDraft(ex.id);
+
             // Cập nhật nhãn exercise hiện tại trên breadcrumbs IDE (Phase 5: Breadcrumbs)
             const breadcrumbCurrent = document.getElementById('ideCurrentBreadcrumb');
             if (breadcrumbCurrent && ex && ex.title) {
@@ -862,11 +794,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (err.name === 'AbortError') return;
             console.error('Lỗi khi nạp bài tập:', err);
             showExerciseError(id, err.message);
+        } finally {
+            if (saveManager) {
+                saveManager.endTransition();
+            }
         }
     };
 
     // 7. Chạy mã Python
     function runCode() {
+        if (saveManager && saveManager.isTransitionInProgress()) return;
         recordAttemptAction('run');
         const code = codeEditor.value;
         const allowed = currentExercise ? (currentExercise.allowedFunctions || currentExercise.allowed_functions || []) : [];
@@ -916,6 +853,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 8. Chấm thử (Test Cases)
     function runTests() {
+        if (saveManager && saveManager.isTransitionInProgress()) return;
         if (currentExercise && (currentExercise.exerciseType === 'multiple_choice' || currentExercise.exerciseType === 'quiz')) {
             submitQuizChoice();
             return;
@@ -985,6 +923,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 9. Nộp bài chính thức (Submit Solution qua Server Judge - Phase 7)
     async function submitSolution() {
+        if (saveManager && saveManager.isTransitionInProgress()) return;
         if (!currentExercise) return;
         if (currentExercise.exerciseType === 'multiple_choice' || currentExercise.exerciseType === 'quiz') {
             submitQuizChoice();
@@ -1071,6 +1010,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     btnResetCode.addEventListener('click', function() {
+        if (saveManager && saveManager.isTransitionInProgress()) return;
         if (currentExercise) {
             if (confirm("Bạn có chắc chắn muốn đặt lại mã nguồn về trạng thái ban đầu?")) {
                 const initial = currentExercise.initialCode || currentExercise.initial_code || '';
@@ -1184,6 +1124,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Khởi tạo bài tập đầu tiên
     if (window.INITIAL_EXERCISE) {
         renderExerciseDetails(window.INITIAL_EXERCISE);
+        loadSavedDraft(window.INITIAL_EXERCISE.id);
     }
     updateLineNumbers();
 
@@ -1191,46 +1132,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAllProgressStates();
 
     // Phase 4: Bảo vệ mã nguồn chưa lưu khi rời trang (Leave Guard)
-    let isNavigatingAway = false;
-
     async function handleSafeNavigation(targetUrl, formToSubmit) {
-        if (isNavigatingAway) return;
-        isNavigatingAway = true;
-
-        // Khóa tạm thời khung soạn thảo để không bị gõ thêm trong lúc chuyển trang
-        if (codeEditor) codeEditor.readOnly = true;
-
-        if (!hasUnsavedChanges()) {
-            if (formToSubmit) {
-                formToSubmit.submit();
-            } else if (targetUrl) {
-                window.location.href = targetUrl;
-            }
-            return;
-        }
-
-        setSaveStatus('saving');
-        const success = await flushCurrentDraft();
-        if (success && !hasUnsavedChanges()) {
-            if (formToSubmit) {
-                formToSubmit.submit();
-            } else if (targetUrl) {
-                window.location.href = targetUrl;
-            }
-        } else {
-            // Mở lại khóa khung soạn thảo nếu lưu lỗi để người dùng tiếp tục sửa/retry
-            if (codeEditor) codeEditor.readOnly = false;
-            isNavigatingAway = false;
-
-            const confirmLeave = confirm('Không thể lưu mã nguồn mới nhất lên máy chủ (mất mạng hoặc lỗi kết nối). Bạn có chắc chắn muốn rời trang và chấp nhận mất phần thay đổi chưa lưu?');
-            if (confirmLeave) {
-                isNavigatingAway = true;
-                if (formToSubmit) {
-                    formToSubmit.submit();
-                } else if (targetUrl) {
-                    window.location.href = targetUrl;
-                }
-            }
+        if (saveManager) {
+            return await saveManager.handleSafeNavigation(targetUrl, formToSubmit);
         }
     }
 
@@ -1254,20 +1158,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const logoutForm = document.querySelector('.nav-compact-user form');
         if (logoutForm) {
             logoutForm.addEventListener('submit', function(e) {
-                if (isNavigatingAway) return;
-                if (hasUnsavedChanges()) {
+                if (saveManager && saveManager.isTransitionInProgress()) {
+                    e.preventDefault();
+                    return;
+                }
+                if (hasUnconfirmedDrafts()) {
                     e.preventDefault();
                     handleSafeNavigation(null, logoutForm);
+                } else {
+                    if (saveManager) saveManager.allowUnload = true;
                 }
             });
         }
 
         // Cảnh báo trình duyệt đóng tab / reload / browser back khi còn thay đổi chưa lưu
         window.addEventListener('beforeunload', function(e) {
-            if (!isNavigatingAway && hasUnsavedChanges()) {
-                e.preventDefault();
-                e.returnValue = '';
-                return '';
+            if (saveManager) {
+                return saveManager.handleBeforeUnload(e);
             }
         });
     }

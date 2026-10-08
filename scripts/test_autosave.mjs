@@ -1,274 +1,463 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import ideWorkerModule from '../web/static/js/ide_worker.js';
 
-/**
- * Mô phỏng Save Worker tuần tự theo đúng thiết kế nâng cấp của web/static/js/ide.js
- */
-function createSaveWorker(apiHandler) {
-    const lastSavedCodeByExercise = {};
-    let isWorkerRunning = false;
-    let pendingSnapshot = null;
-    let inFlightSnapshot = null;
-    let autoSaveTimer = null;
-    let lastSaveFailed = false;
-    let workerWaiters = [];
-    let saveStatus = 'saved';
-    let inFlightRequests = 0;
-    let maxConcurrentRequests = 0;
+const { createSaveManager } = ideWorkerModule;
 
-    let currentExercise = { id: 1, initialCode: 'print("hello")' };
-    let editorValue = currentExercise.initialCode;
-    lastSavedCodeByExercise[1] = currentExercise.initialCode;
-
-    function hasUnsavedChanges() {
-        const savedCode = lastSavedCodeByExercise[currentExercise.id];
-        return editorValue !== savedCode;
-    }
-
-    function updateSaveStatusUI() {
-        if (lastSaveFailed) {
-            saveStatus = 'error';
-        } else if (isWorkerRunning || pendingSnapshot || autoSaveTimer) {
-            saveStatus = 'saving';
-        } else if (hasUnsavedChanges()) {
-            saveStatus = 'saving';
-        } else {
-            saveStatus = 'saved';
-        }
-    }
-
-    function queueDraftSave(exerciseId, code, immediate = false) {
-        lastSaveFailed = false;
-        if (inFlightSnapshot && inFlightSnapshot.exerciseId === exerciseId && inFlightSnapshot.code === code && !pendingSnapshot) {
-            // Snapshot giống hệt đang bay, không cần tạo pending trùng lặp
-        } else {
-            pendingSnapshot = { exerciseId, code };
-        }
-        updateSaveStatusUI();
-
-        if (autoSaveTimer) {
-            clearTimeout(autoSaveTimer);
-            autoSaveTimer = null;
-        }
-
-        if (immediate) {
-            kickSaveWorker();
-        } else {
-            autoSaveTimer = setTimeout(() => {
-                autoSaveTimer = null;
-                kickSaveWorker();
-            }, 30);
-        }
-    }
-
-    async function kickSaveWorker() {
-        if (isWorkerRunning) return;
-        isWorkerRunning = true;
-        updateSaveStatusUI();
-
-        while (pendingSnapshot) {
-            const currentItem = pendingSnapshot;
-            pendingSnapshot = null;
-            inFlightSnapshot = currentItem;
-
-            inFlightRequests++;
-            if (inFlightRequests > maxConcurrentRequests) {
-                maxConcurrentRequests = inFlightRequests;
-            }
-
-            try {
-                const res = await apiHandler(currentItem.exerciseId, currentItem.code);
-                inFlightRequests--;
-
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                lastSavedCodeByExercise[currentItem.exerciseId] = currentItem.code;
-                lastSaveFailed = false;
-            } catch (err) {
-                inFlightRequests--;
-                lastSaveFailed = true;
-                if (!pendingSnapshot) {
-                    pendingSnapshot = currentItem;
-                }
-                break;
-            } finally {
-                inFlightSnapshot = null;
-            }
-        }
-
-        isWorkerRunning = false;
-        updateSaveStatusUI();
-
-        const waiters = workerWaiters;
-        workerWaiters = [];
-        waiters.forEach(resolve => resolve(!hasUnsavedChanges()));
-    }
-
-    async function flushCurrentDraft() {
-        if (autoSaveTimer) {
-            clearTimeout(autoSaveTimer);
-            autoSaveTimer = null;
-        }
-
-        if (hasUnsavedChanges()) {
-            if (!inFlightSnapshot || inFlightSnapshot.code !== editorValue || inFlightSnapshot.exerciseId !== currentExercise.id) {
-                pendingSnapshot = { exerciseId: currentExercise.id, code: editorValue };
-            }
-        }
-
-        if (!pendingSnapshot && !isWorkerRunning) {
-            return !hasUnsavedChanges();
-        }
-
-        const waitPromise = new Promise(resolve => {
-            workerWaiters.push(resolve);
-        });
-
-        kickSaveWorker();
-        return await waitPromise;
-    }
-
-    return {
-        get editorValue() { return editorValue; },
-        set editorValue(v) { editorValue = v; },
-        get saveStatus() { return saveStatus; },
-        get maxConcurrentRequests() { return maxConcurrentRequests; },
-        get lastSavedCode() { return lastSavedCodeByExercise[currentExercise.id]; },
-        hasUnsavedChanges,
-        queueDraftSave,
-        flushCurrentDraft,
-        setExercise: (ex) => {
-            currentExercise = ex;
-            editorValue = ex.initialCode;
-            if (!lastSavedCodeByExercise[ex.id]) {
-                lastSavedCodeByExercise[ex.id] = ex.initialCode;
-            }
-        }
-    };
+// Helper tạo deferred promise để điều khiển thứ tự response chính xác
+function createDeferred() {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
 }
 
-test('1. Ghi tuần tự: Không có 2 request lưu chạy song song và bản cuối cùng là V3', async () => {
+test('1. Worker tuần tự: V1 đang chạy, V2/V3 chờ -> Chỉ một save request chạy và bản cuối là V3', async () => {
     const serverLogs = [];
-    let resolveV1;
-    const v1Promise = new Promise(res => { resolveV1 = res; });
+    const v1Deferred = createDeferred();
 
-    const worker = createSaveWorker(async (exerciseId, code) => {
-        serverLogs.push({ event: 'start', code });
-        if (code === 'V1') {
-            await v1Promise;
-        } else {
-            await new Promise(r => setTimeout(r, 10));
+    let editorVal = 'print("hello")';
+    let currentEx = { id: 1, initialCode: 'print("hello")' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        getCurrentExercise: () => currentEx,
+        debounceMs: 20,
+        apiSave: async (exerciseId, code) => {
+            serverLogs.push({ event: 'start', code });
+            if (code === 'V1') {
+                await v1Deferred.promise;
+            } else {
+                await new Promise(r => setTimeout(r, 10));
+            }
+            serverLogs.push({ event: 'finish', code });
+            return { ok: true, status: 200 };
         }
-        serverLogs.push({ event: 'finish', code });
-        return { ok: true, status: 200 };
     });
 
-    // 1. Gõ V1 và kích hoạt lưu ngay
-    worker.editorValue = 'V1';
-    worker.queueDraftSave(1, 'V1', true);
-
-    // Đợi chút để V1 bắt đầu gửi
+    // 1. Gõ V1 và lưu ngay
+    editorVal = 'V1';
+    saveManager.queueDraftSave(1, 'V1', true);
     await new Promise(r => setTimeout(r, 5));
 
-    // 2. Trong lúc V1 đang bay, người dùng gõ V2 rồi V3
-    worker.editorValue = 'V2';
-    worker.queueDraftSave(1, 'V2', true);
+    // 2. Trong lúc V1 đang bay, gõ V2 rồi V3
+    editorVal = 'V2';
+    saveManager.queueDraftSave(1, 'V2', true);
+    editorVal = 'V3';
+    saveManager.queueDraftSave(1, 'V3', true);
 
-    worker.editorValue = 'V3';
-    worker.queueDraftSave(1, 'V3', true);
+    // 3. Cho V1 hoàn thành
+    v1Deferred.resolve();
 
-    // Cho V1 hoàn thành
-    resolveV1();
-
-    // Chờ flush hoàn tất
-    const success = await worker.flushCurrentDraft();
+    const success = await saveManager.flushCurrentDraft();
 
     assert.equal(success, true, 'Flush phải thành công');
-    assert.equal(worker.maxConcurrentRequests, 1, 'Số request đồng thời tối đa phải là 1 (Single-flight)');
-    assert.equal(worker.lastSavedCode, 'V3', 'Bản ghi cuối cùng được xác nhận phải là V3');
-    assert.equal(worker.hasUnsavedChanges(), false, 'Không còn thay đổi chưa lưu');
+    assert.equal(saveManager.maxConcurrentRequests, 1, 'Số request đồng thời tối đa phải là 1 (Single-flight)');
+    assert.equal(saveManager.getLastSavedCode(1), 'V3', 'Bản ghi cuối cùng được xác nhận phải là V3');
+    assert.equal(saveManager.hasUnsavedChanges(), false, 'Không còn thay đổi chưa lưu');
 
-    // Kiểm tra thứ tự server nhận
     const finishedCodes = serverLogs.filter(l => l.event === 'finish').map(l => l.code);
-    assert.deepEqual(finishedCodes, ['V1', 'V3'], 'Server chỉ nhận V1 rồi đến bản mới nhất V3 (V2 đã được gộp)');
+    assert.deepEqual(finishedCodes, ['V1', 'V3'], 'Server chỉ nhận V1 rồi đến V3 (V2 đã được gộp)');
 });
 
-test('2. Nhiều lời gọi flushCurrentDraft đồng thời không tạo request song song', async () => {
-    let callCount = 0;
-    const worker = createSaveWorker(async (exerciseId, code) => {
-        callCount++;
-        await new Promise(r => setTimeout(r, 20));
-        return { ok: true, status: 200 };
+test('2. Đổi bài tải chậm: Flush A xong; giữ response B -> Editor vẫn khóa; reset/chọn bài khác bị chặn', async () => {
+    let editorVal = 'code_A_edited';
+    let readOnlyState = false;
+    let currentEx = { id: 1, initialCode: 'code_A_initial' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx,
+        apiSave: async () => ({ ok: true, status: 200 })
     });
 
-    worker.editorValue = 'code_ABC';
-    worker.queueDraftSave(1, 'code_ABC', false);
+    // Mô phỏng logic chuyển bài của IDE
+    const bDeferred = createDeferred();
 
-    // Gọi flush đồng thời từ 3 nơi (Back button, AutoSave, Menu)
-    const [res1, res2, res3] = await Promise.all([
-        worker.flushCurrentDraft(),
-        worker.flushCurrentDraft(),
-        worker.flushCurrentDraft()
-    ]);
+    async function switchExercise(targetId) {
+        if (saveManager.isTransitionInProgress()) return false;
+        if (!saveManager.startTransition()) return false;
 
-    assert.equal(res1, true);
-    assert.equal(res2, true);
-    assert.equal(res3, true);
-    assert.equal(worker.maxConcurrentRequests, 1, 'Chỉ 1 request chạy tại 1 thời điểm');
-    assert.equal(callCount, 1, 'Chỉ gọi API 1 lần cho snapshot đó');
-});
-
-test('3. API lỗi thì giữ nguyên code, flush trả false, sau đó retry thành công', async () => {
-    let shouldFail = true;
-    const worker = createSaveWorker(async (exerciseId, code) => {
-        await new Promise(r => setTimeout(r, 10));
-        if (shouldFail) {
-            return { ok: false, status: 500 };
-        }
-        return { ok: true, status: 200 };
-    });
-
-    worker.editorValue = 'draft_important';
-    worker.queueDraftSave(1, 'draft_important', true);
-
-    const firstFlush = await worker.flushCurrentDraft();
-    assert.equal(firstFlush, false, 'Lưu thất bại phải trả false');
-    assert.equal(worker.saveStatus, 'error', 'Trạng thái UI phải là error');
-    assert.equal(worker.hasUnsavedChanges(), true, 'Code vẫn chưa được đánh dấu là saved');
-
-    // Mạng phục hồi
-    shouldFail = false;
-    const retryFlush = await worker.flushCurrentDraft();
-    assert.equal(retryFlush, true, 'Retry thành công phải trả true');
-    assert.equal(worker.saveStatus, 'saved', 'Trạng thái UI trở lại saved');
-    assert.equal(worker.lastSavedCode, 'draft_important');
-});
-
-test('4. Chặn chuyển bài khi flush lưu thất bại', async () => {
-    const worker = createSaveWorker(async () => {
-        return { ok: false, status: 500 };
-    });
-
-    worker.editorValue = 'my_exercise_1_code';
-
-    // Giả lập logic chuyển bài của window.loadExercise
-    let currentExId = 1;
-    let switched = false;
-
-    async function trySwitchExercise(newId) {
-        if (worker.hasUnsavedChanges()) {
-            const saved = await worker.flushCurrentDraft();
-            if (!saved || worker.hasUnsavedChanges()) {
-                return false; // Dừng chuyển bài
+        try {
+            if (saveManager.hasUnconfirmedDrafts()) {
+                const saved = await saveManager.flushCurrentDraft();
+                if (!saved || saveManager.hasUnconfirmedDrafts()) return false;
             }
+
+            // Đang fetch bài mới (bị delay)
+            await bDeferred.promise;
+
+            currentEx = { id: targetId, initialCode: 'code_B_initial' };
+            editorVal = currentEx.initialCode;
+            saveManager.setExercise(currentEx);
+            return true;
+        } finally {
+            saveManager.endTransition();
         }
-        currentExId = newId;
-        switched = true;
-        return true;
     }
 
-    const switchResult = await trySwitchExercise(2);
-    assert.equal(switchResult, false, 'Chuyển bài phải bị từ chối');
-    assert.equal(switched, false, 'Không được phép chuyển bài');
-    assert.equal(currentExId, 1, 'Vẫn giữ bài tập cũ');
-    assert.equal(worker.editorValue, 'my_exercise_1_code', 'Code bài cũ còn nguyên');
+    // Bắt đầu chuyển sang bài 2
+    const switchPromise = switchExercise(2);
+    await new Promise(r => setTimeout(r, 10));
+
+    // Trong lúc bài 2 đang tải:
+    assert.equal(saveManager.isTransitionInProgress(), true, 'Transition lock phải đang bật');
+    assert.equal(readOnlyState, true, 'Editor phải đang ở chế độ readOnly');
+
+    // Thao tác reset hoặc gõ phím bị chặn
+    function tryResetCode() {
+        if (saveManager.isTransitionInProgress()) return false;
+        editorVal = currentEx.initialCode;
+        return true;
+    }
+    assert.equal(tryResetCode(), false, 'Reset code phải bị chặn khi transition đang chạy');
+
+    // Thao tác chuyển sang bài 3 cạnh tranh bị chặn
+    const switch3Result = await switchExercise(3);
+    assert.equal(switch3Result, false, 'Chuyển sang bài khác phải bị chặn khi transition đang chạy');
+
+    // Cho request bài 2 hoàn thành
+    bDeferred.resolve();
+    const switchResult = await switchPromise;
+
+    assert.equal(switchResult, true, 'Chuyển bài 2 thành công sau khi response');
+    assert.equal(saveManager.isTransitionInProgress(), false, 'Transition lock phải được giải phóng');
+    assert.equal(readOnlyState, false, 'Editor phải được mở khóa');
+    assert.equal(currentEx.id, 2, 'Context hiện tại là bài 2');
+});
+
+test('3. Tải bài mới thất bại: API đọc lỗi -> Giữ bài cũ, mở khóa, không đổi context', async () => {
+    let editorVal = 'code_A_important';
+    let readOnlyState = false;
+    let currentEx = { id: 1, initialCode: 'code_A_initial' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx,
+        apiSave: async () => ({ ok: true, status: 200 })
+    });
+
+    let currentBreadcrumb = 'Bài 1';
+
+    async function switchExerciseWithError(targetId) {
+        if (saveManager.isTransitionInProgress()) return false;
+        if (!saveManager.startTransition()) return false;
+
+        try {
+            if (saveManager.hasUnconfirmedDrafts()) {
+                const saved = await saveManager.flushCurrentDraft();
+                if (!saved || saveManager.hasUnconfirmedDrafts()) return false;
+            }
+
+            // Mô phỏng fetch bài mới thất bại (500)
+            throw new Error('HTTP 500 Network Error');
+        } catch (err) {
+            return false;
+        } finally {
+            saveManager.endTransition();
+        }
+    }
+
+    const res = await switchExerciseWithError(2);
+    assert.equal(res, false, 'Chuyển bài thất bại');
+    assert.equal(currentEx.id, 1, 'Vẫn giữ context bài cũ (id: 1)');
+    assert.equal(editorVal, 'code_A_important', 'Code bài cũ còn nguyên');
+    assert.equal(currentBreadcrumb, 'Bài 1', 'Breadcrumb không bị đổi sang bài lỗi');
+    assert.equal(saveManager.isTransitionInProgress(), false, 'Transition lock phải được mở lại');
+    assert.equal(readOnlyState, false, 'Editor được mở lại cho người dùng');
+});
+
+test('4. Khởi tạo nháp chậm: Khóa được giữ cho đến khi nạp draft bài mới xong -> Không ghi đè code mới', async () => {
+    let editorVal = '';
+    let readOnlyState = false;
+    let currentEx = { id: 1, initialCode: 'code_A' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx,
+        apiSave: async () => ({ ok: true, status: 200 })
+    });
+
+    const draftDeferred = createDeferred();
+
+    async function switchAndLoadDraft(targetEx) {
+        saveManager.startTransition();
+        try {
+            // Render starter code
+            currentEx = targetEx;
+            editorVal = targetEx.initialCode;
+            saveManager.setLastSavedCode(targetEx.id, targetEx.initialCode);
+
+            // Chờ draft nạp xong TRƯỚC KHI mở khóa
+            const draft = await draftDeferred.promise;
+            if (draft) {
+                editorVal = draft;
+                saveManager.setLastSavedCode(targetEx.id, draft);
+            }
+        } finally {
+            saveManager.endTransition();
+        }
+    }
+
+    const switchPromise = switchAndLoadDraft({ id: 2, initialCode: 'starter_B' });
+    await new Promise(r => setTimeout(r, 5));
+
+    // Trong lúc draft chưa về, editor vẫn bị khóa nên người dùng không gõ đè
+    assert.equal(readOnlyState, true, 'Editor vẫn khóa trong lúc draft đang nạp');
+
+    // Draft server trả về
+    draftDeferred.resolve('saved_draft_B');
+    await switchPromise;
+
+    assert.equal(editorVal, 'saved_draft_B', 'Draft hợp lệ được nạp thành công');
+    assert.equal(readOnlyState, false, 'Chỉ mở khóa sau khi draft đã hoàn tất');
+});
+
+test('5. Pending của bài cũ: Editor bài hiện tại sạch, worker còn snapshot A -> Home chờ lưu A', async () => {
+    let editorVal = 'starter_B';
+    let currentEx = { id: 2, initialCode: 'starter_B' }; // Bài 2 sạch 100%
+    const saveDeferredA = createDeferred();
+    let savedA = false;
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        getCurrentExercise: () => currentEx,
+        apiSave: async (exId, code) => {
+            if (exId === 1) {
+                await saveDeferredA.promise;
+                savedA = true;
+            }
+            return { ok: true, status: 200 };
+        }
+    });
+
+    // Giả lập worker còn snapshot bài 1 đang chờ lưu
+    saveManager.queueDraftSave(1, 'code_A_snapshot', true);
+
+    // Bài 2 hiện tại hoàn toàn sạch
+    assert.equal(saveManager.hasUnsavedChanges(), false, 'Bài 2 không có thay đổi chưa lưu trong editor');
+    assert.equal(saveManager.hasUnconfirmedDrafts(), true, 'Nhưng hệ thống vẫn còn snapshot chưa lưu của bài 1');
+
+    let navigated = false;
+    const navPromise = saveManager.handleSafeNavigation('/home', null);
+
+    // handleSafeNavigation không được rời ngay
+    await new Promise(r => setTimeout(r, 10));
+    assert.equal(savedA, false, 'Chưa flush xong bài 1');
+
+    // Cho bài 1 lưu xong
+    saveDeferredA.resolve();
+    const navResult = await navPromise;
+
+    assert.equal(navResult, true, 'Điều hướng thành công sau khi bài 1 đã lưu xong');
+    assert.equal(savedA, true, 'Bài 1 đã được xác nhận lưu trên máy chủ');
+    assert.equal(saveManager.hasUnconfirmedDrafts(), false, 'Mọi draft đã lưu sạch 100%');
+});
+
+test('6. Code quay về bản đã lưu: Request code khác đang chạy, editor trở lại cũ -> Bản cuối khớp editor trước khi rời', async () => {
+    const serverSavedCodes = [];
+    const v1Deferred = createDeferred();
+
+    let editorVal = 'V0';
+    let currentEx = { id: 1, initialCode: 'V0' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: 'V0',
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        getCurrentExercise: () => currentEx,
+        apiSave: async (exId, code) => {
+            if (code === 'V1') {
+                await v1Deferred.promise;
+            }
+            serverSavedCodes.push(code);
+            return { ok: true, status: 200 };
+        }
+    });
+
+    // 1. Gõ V1 và kích hoạt lưu
+    editorVal = 'V1';
+    saveManager.queueDraftSave(1, 'V1', true);
+    await new Promise(r => setTimeout(r, 5));
+
+    // 2. Trong lúc V1 đang bay, người dùng sửa lại về V0 (giá trị đã lưu ban đầu)
+    editorVal = 'V0';
+
+    // 3. Gọi flush (hoặc điều hướng rời trang)
+    const flushPromise = saveManager.flushCurrentDraft();
+
+    // Cho V1 hoàn tất
+    v1Deferred.resolve();
+    await flushPromise;
+
+    // Server phải kết thúc bằng V0 khớp với editor hiện tại
+    assert.deepEqual(serverSavedCodes, ['V1', 'V0'], 'Server phải nhận lại V0 sau khi V1 kết thúc');
+    assert.equal(saveManager.getLastSavedCode(1), 'V0', 'Bản cuối cùng xác nhận trên server là V0');
+});
+
+test('7. beforeunload khi flush chậm: Draft dirty, transition đang lưu -> Cảnh báo được kích hoạt, allowUnload chưa bật', async () => {
+    let editorVal = 'dirty_code';
+    let currentEx = { id: 1, initialCode: 'clean_code' };
+    const flushDeferred = createDeferred();
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        getCurrentExercise: () => currentEx,
+        apiSave: async () => {
+            await flushDeferred.promise;
+            return { ok: true, status: 200 };
+        }
+    });
+
+    // Bắt đầu điều hướng an toàn (bắt đầu flush)
+    const navPromise = saveManager.handleSafeNavigation('/dashboard', null);
+    await new Promise(r => setTimeout(r, 5));
+
+    // Lúc này request đang bay trên mạng
+    assert.equal(saveManager.allowUnload, false, 'allowUnload PHẢI là false khi flush chưa xong');
+    assert.equal(saveManager.hasUnconfirmedDrafts(), true, 'Còn draft chưa xác nhận');
+
+    // Giả lập sự kiện beforeunload từ trình duyệt
+    let defaultPrevented = false;
+    let returnValue = undefined;
+    const fakeEvent = {
+        preventDefault: () => { defaultPrevented = true; },
+        set returnValue(val) { returnValue = val; },
+        get returnValue() { return returnValue; }
+    };
+
+    saveManager.handleBeforeUnload(fakeEvent);
+
+    assert.equal(defaultPrevented, true, 'beforeunload phải gọi preventDefault() để chặn đóng tab');
+    assert.equal(returnValue, '', 'returnValue phải được đặt chuỗi rỗng để kích hoạt popup trình duyệt');
+
+    // Giải phóng flush
+    flushDeferred.resolve();
+    await navPromise;
+});
+
+test('8. beforeunload sau khi lưu đủ: Không còn pending/in-flight/dirty -> Không cảnh báo thừa', async () => {
+    let editorVal = 'clean_code';
+    let currentEx = { id: 1, initialCode: 'clean_code' };
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        getCurrentExercise: () => currentEx,
+        apiSave: async () => ({ ok: true, status: 200 })
+    });
+
+    assert.equal(saveManager.hasUnconfirmedDrafts(), false, 'Không còn draft nào chưa xác nhận');
+
+    let defaultPrevented = false;
+    let returnValue = undefined;
+    const fakeEvent = {
+        preventDefault: () => { defaultPrevented = true; },
+        set returnValue(val) { returnValue = val; },
+        get returnValue() { return returnValue; }
+    };
+
+    const res = saveManager.handleBeforeUnload(fakeEvent);
+
+    assert.equal(defaultPrevented, false, 'Không được gọi preventDefault khi mọi thứ đã lưu');
+    assert.equal(returnValue, undefined, 'returnValue phải là undefined');
+    assert.equal(res, undefined);
+});
+
+test('9. Lưu lỗi hoặc hủy rời trang: Flush lỗi, người dùng không bỏ draft -> Giữ code, mở khóa, guard vẫn hoạt động', async () => {
+    let editorVal = 'valuable_code';
+    let readOnlyState = false;
+    let currentEx = { id: 1, initialCode: 'starter' };
+
+    let userConfirmChoice = false; // Người dùng bấm Cancel (không chấp nhận mất code)
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        setEditorValue: (v) => { editorVal = v; },
+        setReadOnly: (ro) => { readOnlyState = ro; },
+        isReadOnly: () => readOnlyState,
+        getCurrentExercise: () => currentEx,
+        confirmLeave: () => userConfirmChoice,
+        apiSave: async () => {
+            return { ok: false, status: 500 };
+        }
+    });
+
+    let navigated = false;
+    saveManager.onNavigate = () => { navigated = true; };
+
+    const result = await saveManager.handleSafeNavigation('/home', null);
+
+    assert.equal(result, false, 'Điều hướng bị hủy');
+    assert.equal(navigated, false, 'Không thực hiện chuyển trang');
+    assert.equal(saveManager.isTransitionInProgress(), false, 'Transition lock phải được mở lại');
+    assert.equal(saveManager.allowUnload, false, 'allowUnload vẫn là false');
+    assert.equal(readOnlyState, false, 'Editor được mở lại cho người dùng');
+    assert.equal(editorVal, 'valuable_code', 'Code của người dùng được bảo toàn');
+    assert.equal(saveManager.hasUnconfirmedDrafts(), true, 'Vẫn còn draft chưa lưu');
+
+    // Thử lại lần 2 với xác nhận cho phép bỏ qua
+    userConfirmChoice = true;
+    const result2 = await saveManager.handleSafeNavigation('/home', null);
+    assert.equal(result2, true, 'Cho phép rời trang sau khi người dùng đã xác nhận bỏ thay đổi');
+    assert.equal(saveManager.allowUnload, true, 'allowUnload được bật');
+});
+
+test('10. Double-click / link / logout cạnh tranh: Chỉ một transition được thực hiện', async () => {
+    let editorVal = 'some_code';
+    let currentEx = { id: 1, initialCode: 'init' };
+    const flushDeferred = createDeferred();
+    let navCount = 0;
+
+    const saveManager = createSaveManager({
+        initialExercise: currentEx,
+        initialCode: currentEx.initialCode,
+        getEditorValue: () => editorVal,
+        getCurrentExercise: () => currentEx,
+        onNavigate: () => { navCount++; },
+        apiSave: async () => {
+            await flushDeferred.promise;
+            return { ok: true, status: 200 };
+        }
+    });
+
+    // Click lần 1 vào Back
+    const nav1Promise = saveManager.handleSafeNavigation('/prev', null);
+
+    // Click lần 2 ngay sau đó vào Home hoặc Logout trong lúc lần 1 đang flush
+    const nav2Promise = saveManager.handleSafeNavigation('/home', null);
+
+    assert.equal(await nav2Promise, false, 'Thao tác điều hướng thứ hai phải bị từ chối ngay lập tức');
+
+    flushDeferred.resolve();
+    assert.equal(await nav1Promise, true, 'Thao tác điều hướng đầu tiên hoàn thành');
+    assert.equal(navCount, 1, 'Chỉ thực hiện điều hướng đúng 1 lần');
 });

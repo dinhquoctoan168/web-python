@@ -26,5 +26,14 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run JavaScript regression tests
+        run: node --test scripts/test_autosave.mjs
+
       - name: Build
         run: go build ./...
+
