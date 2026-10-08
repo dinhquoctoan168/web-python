@@ -2,7 +2,6 @@ package class
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"web_python/internal/auth"
 	"web_python/internal/course"
 	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 // Handler quản lý các HTTP endpoints của lớp học
@@ -52,11 +52,19 @@ func (h *Handler) HandleTeacherListClasses(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lớp học", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "classes", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "classes.html"), map[string]any{
-		"Title":   "Quản lý Lớp học",
-		"Classes": classes,
-		"Courses": courses,
-		"User":    user,
+		"Title":     "Quản lý Lớp học",
+		"Classes":   classes,
+		"Courses":   courses,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "classes",
 	})
 }
 
@@ -89,13 +97,22 @@ func (h *Handler) HandleTeacherClassDetail(w http.ResponseWriter, r *http.Reques
 	msg := r.URL.Query().Get("msg")
 	errMsg := r.URL.Query().Get("error")
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lớp học", URL: "/teacher/classes"},
+		{Label: cl.Name, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "classes", breadcrumbs, "/teacher/classes", "Quản lý lớp học", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "class_detail.html"), map[string]any{
-		"Title":    "Lớp: " + cl.Name,
-		"Class":    cl,
-		"Students": students,
-		"User":     user,
-		"Message":  msg,
-		"Error":    errMsg,
+		"Title":     "Lớp: " + cl.Name,
+		"Class":     cl,
+		"Students":  students,
+		"User":      user,
+		"Message":   msg,
+		"Error":     errMsg,
+		"Nav":       nav,
+		"ActiveNav": "classes",
 	})
 }
 
@@ -222,10 +239,18 @@ func (h *Handler) HandleStudentMyClasses(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lớp học của tôi", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "classes", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "classes.html"), map[string]any{
-		"Title":   "Lớp học của tôi",
-		"Classes": classes,
-		"User":    user,
+		"Title":     "Lớp học của tôi",
+		"Classes":   classes,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "classes",
 	})
 }
 
@@ -233,8 +258,7 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 	if m, ok := data.(map[string]any); ok {
 		frontend.InjectCSRFToMap(r, m)
 	}
-	resolvedPath := frontend.ResolveTemplatePath(tmplPath)
-	tmpl, err := template.ParseFiles(resolvedPath)
+	tmpl, err := frontend.ParseFilesWithShared(tmplPath)
 	if err != nil {
 		http.Error(w, "Không tìm thấy giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

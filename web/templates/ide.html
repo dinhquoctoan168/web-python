@@ -3,10 +3,7 @@
     <!-- Top Navigation Bar -->
     <header class="ide-header">
         <div class="header-left">
-            <div class="logo">
-                <span class="logo-icon">&#128187;</span>
-                <span class="logo-text">AlgoDB <strong>Python IDE</strong></span>
-            </div>
+            {{ template "app_nav_compact" .Nav }}
             <div class="current-exercise-badge">
                 <span class="badge-title" id="topExerciseTitle">{{ if .CurrentExercise }}{{ .CurrentExercise.Title }}{{ else }}Chưa chọn bài{{ end }}</span>
                 <span class="badge-difficulty badge-{{ if .CurrentExercise }}{{ .CurrentExercise.Difficulty }}{{ end }}" id="topExerciseDiff">
@@ -33,12 +30,6 @@
             <button id="btnSubmitCode" class="btn btn-success" title="Nộp bài chính thức và chấm qua Server Judge" style="background-color: var(--accent-emerald, #10b981); border-color: var(--accent-emerald, #10b981); color: #fff;">
                 <span class="icon">&#128228;</span> Nộp bài
             </button>
-            <form action="/logout" method="POST" style="display:inline; margin-left: 8px;">
-                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-                <button type="submit" class="btn btn-secondary" title="Đăng xuất" style="padding: 6px 12px;">
-                    <span class="icon">&#10140;</span> Đăng xuất
-                </button>
-            </form>
         </div>
     </header>
 

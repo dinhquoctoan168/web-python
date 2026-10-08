@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/nav.css">
     <link rel="stylesheet" href="/static/css/lesson.css">
     <link rel="stylesheet" href="/static/css/visualization.css">
     <!-- Skulpt Runtime -->
@@ -12,27 +13,7 @@
     <script src="/static/js/engine.js"></script>
 </head>
 <body>
-    <header class="navbar">
-        <a href="/courses" class="nav-brand">
-            <span>&#128187;</span>
-            <span>Web Python <strong>Platform</strong></span>
-        </a>
-        <nav class="nav-links">
-            <a href="/courses">Môn học</a>
-            <a href="/course?id={{ .Lesson.CourseID }}">{{ .Lesson.CourseCode }}</a>
-            <a href="/ide?mode=practice&course={{ .Lesson.CourseCode }}">Luyện tập (IDE)</a>
-        </nav>
-        <div class="nav-user">
-            {{ if .User }}
-                <span>{{ .User.FullName }}</span>
-                <span class="badge-role">{{ .User.Role }}</span>
-                <form action="/logout" method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
-                </form>
-            {{ end }}
-        </div>
-    </header>
+    {{ template "app_nav" .Nav }}
 
     <div class="lesson-layout">
         <!-- Sidebar cây chương mục -->
@@ -59,6 +40,7 @@
 
         <!-- Khung nội dung bài học -->
         <main class="lesson-content-area">
+            {{ template "breadcrumb" .Nav.Breadcrumbs }}
             <div style="margin-bottom: 24px;">
                 <span class="course-code" style="margin-bottom: 6px; display: inline-block;">{{ .Lesson.CourseCode }}</span>
                 <h1 style="color: var(--text-bright); font-size: 26px; margin-bottom: 8px;">{{ .Lesson.Title }}</h1>
@@ -115,7 +97,7 @@
 
             <div style="display: flex; justify-content: space-between; margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--border-color);">
                 <a href="/course?id={{ .Lesson.CourseID }}" class="btn btn-secondary">&larr; Trở về môn học</a>
-                <a href="/ide?mode=practice&course={{ .Lesson.CourseCode }}" class="btn btn-primary">Luyện tập bài tập trên IDE &rarr;</a>
+                <a href="/ide?mode=practice&course={{ .Lesson.CourseCode }}&lesson_id={{ .Lesson.ID }}" class="btn btn-primary">Luyện tập bài tập trên IDE &rarr;</a>
             </div>
         </main>
     </div>

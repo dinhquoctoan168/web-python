@@ -1,0 +1,18 @@
+{{ define "breadcrumb" }}
+{{ if . }}
+<nav aria-label="Đường dẫn phân cấp" class="app-breadcrumb">
+    <ol class="breadcrumb-list">
+        {{ range $idx, $crumb := . }}
+        <li class="breadcrumb-item {{ if not $crumb.URL }}current{{ end }}">
+            {{ if $crumb.URL }}
+                <a href="{{ $crumb.URL }}">{{ $crumb.Label }}</a>
+                <span class="breadcrumb-separator">/</span>
+            {{ else }}
+                <span aria-current="page">{{ $crumb.Label }}</span>
+            {{ end }}
+        </li>
+        {{ end }}
+    </ol>
+</nav>
+{{ end }}
+{{ end }}

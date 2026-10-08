@@ -11,6 +11,7 @@ import (
 	"web_python/internal/class"
 	"web_python/internal/exercise"
 	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 type Handler struct {
@@ -41,10 +42,18 @@ func (h *Handler) HandleTeacherListAssignments(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Bài tập", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "assignments", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "assignment_list.html"), map[string]any{
 		"Title":       "Quản lý Bài tập",
 		"Assignments": assignments,
 		"User":        user,
+		"Nav":         nav,
+		"ActiveNav":   "assignments",
 	})
 }
 
@@ -68,11 +77,20 @@ func (h *Handler) HandleTeacherNewAssignmentForm(w http.ResponseWriter, r *http.
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Bài tập", URL: "/teacher/assignments"},
+		{Label: "Giao bài tập mới", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "assignments", breadcrumbs, "/teacher/assignments", "Quản lý bài tập", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "assignment_form.html"), map[string]any{
 		"Title":     "Giao bài tập mới",
 		"Classes":   classes,
 		"Exercises": exercises,
 		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "assignments",
 	})
 }
 
@@ -153,10 +171,19 @@ func (h *Handler) HandleTeacherAssignmentDetail(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Bài tập", URL: "/teacher/assignments"},
+		{Label: a.Title, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "assignments", breadcrumbs, "/teacher/assignments", "Quản lý bài tập", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "assignment_detail.html"), map[string]any{
 		"Title":      a.Title,
 		"Assignment": a,
 		"User":       user,
+		"Nav":        nav,
+		"ActiveNav":  "assignments",
 	})
 }
 
@@ -231,10 +258,19 @@ func (h *Handler) HandleStudentAssignmentDetail(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Bài tập", URL: "/my-assignments"},
+		{Label: a.Title, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "assignments", breadcrumbs, "/my-assignments", "Danh sách bài tập", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "assignment_detail.html"), map[string]any{
 		"Title":      a.Title,
 		"Assignment": a,
 		"User":       user,
+		"Nav":        nav,
+		"ActiveNav":  "assignments",
 	})
 }
 
@@ -253,10 +289,18 @@ func (h *Handler) HandleStudentMyAssignments(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Bài tập", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "assignments", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "assignment_list.html"), map[string]any{
 		"Title":       "Bài tập được giao",
 		"Assignments": assignments,
 		"User":        user,
+		"Nav":         nav,
+		"ActiveNav":   "assignments",
 	})
 }
 
@@ -272,8 +316,10 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 			return ""
 		},
 	}
-	resolvedPath := frontend.ResolveTemplatePath(tmplPath)
-	tmpl, err := template.New(filepath.Base(resolvedPath)).Funcs(funcMap).ParseFiles(resolvedPath)
+	mainFile := frontend.ResolveTemplatePath(tmplPath)
+	allFiles := []string{mainFile}
+	allFiles = append(allFiles, frontend.GetSharedTemplatePaths()...)
+	tmpl, err := template.New(filepath.Base(mainFile)).Funcs(funcMap).ParseFiles(allFiles...)
 	if err != nil {
 		http.Error(w, "Lỗi nạp giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

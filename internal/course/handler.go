@@ -2,13 +2,13 @@ package course
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"path/filepath"
 	"strconv"
 
 	"web_python/internal/auth"
 	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 // Handler quản lý các HTTP endpoints của môn học
@@ -45,10 +45,14 @@ func (h *Handler) HandleListCourses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := auth.GetUser(r.Context())
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", nil, "", "", csrf)
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "course", "list.html"), map[string]any{
-		"Title":   "Danh sách môn học",
-		"Courses": courses,
-		"User":    user,
+		"Title":     "Danh sách môn học",
+		"Courses":   courses,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "courses",
 	})
 }
 
@@ -84,11 +88,20 @@ func (h *Handler) HandleCourseDetail(w http.ResponseWriter, r *http.Request) {
 		curr, _ = h.curriculumFetcher(id, isTeacher)
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/courses"},
+		{Label: c.Name, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/courses", "Danh sách môn học", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "course", "detail.html"), map[string]any{
 		"Title":      c.Name + " (" + c.Code + ")",
 		"Course":     c,
 		"Curriculum": curr,
 		"User":       user,
+		"Nav":        nav,
+		"ActiveNav":  "courses",
 	})
 }
 
@@ -101,20 +114,36 @@ func (h *Handler) HandleTeacherListCourses(w http.ResponseWriter, r *http.Reques
 	}
 
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "", "", csrf)
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "courses.html"), map[string]any{
-		"Title":   "Quản lý Môn học",
-		"Courses": courses,
-		"User":    user,
+		"Title":     "Quản lý Môn học",
+		"Courses":   courses,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "courses",
 	})
 }
 
 // HandleTeacherNewCourseForm hiển thị form thêm môn học (GET /teacher/course/new)
 func (h *Handler) HandleTeacherNewCourseForm(w http.ResponseWriter, r *http.Request) {
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/teacher/courses"},
+		{Label: "Thêm mới", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/courses", "Quản lý môn học", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "course_form.html"), map[string]any{
-		"Title": "Thêm môn học mới",
-		"IsNew": true,
-		"User":  user,
+		"Title":     "Thêm môn học mới",
+		"IsNew":     true,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "courses",
 	})
 }
 
@@ -137,6 +166,12 @@ func (h *Handler) HandleTeacherCreateCourse(w http.ResponseWriter, r *http.Reque
 
 	_, err := h.service.CreateCourse(code, name, desc, userID)
 	if err != nil {
+		breadcrumbs := []frontend.Breadcrumb{
+			{Label: "Môn học", URL: "/teacher/courses"},
+			{Label: "Thêm mới", URL: ""},
+		}
+		csrf := security.GetTokenFromContext(r.Context())
+		nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/courses", "Quản lý môn học", csrf)
 		h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "course_form.html"), map[string]any{
 			"Title": "Thêm môn học mới",
 			"IsNew": true,
@@ -146,7 +181,9 @@ func (h *Handler) HandleTeacherCreateCourse(w http.ResponseWriter, r *http.Reque
 				"Name":        name,
 				"Description": desc,
 			},
-			"User": user,
+			"User":      user,
+			"Nav":       nav,
+			"ActiveNav": "courses",
 		})
 		return
 	}
@@ -170,11 +207,20 @@ func (h *Handler) HandleTeacherEditCourseForm(w http.ResponseWriter, r *http.Req
 	}
 
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/teacher/courses"},
+		{Label: c.Name, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/courses", "Quản lý môn học", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "course_form.html"), map[string]any{
-		"Title":  "Chỉnh sửa môn học: " + c.Code,
-		"IsNew":  false,
-		"Course": c,
-		"User":   user,
+		"Title":     "Chỉnh sửa môn học: " + c.Code,
+		"IsNew":     false,
+		"Course":    c,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "courses",
 	})
 }
 
@@ -200,6 +246,12 @@ func (h *Handler) HandleTeacherUpdateCourse(w http.ResponseWriter, r *http.Reque
 	user := auth.GetUser(r.Context())
 	_, err = h.service.UpdateCourse(id, code, name, desc, status)
 	if err != nil {
+		breadcrumbs := []frontend.Breadcrumb{
+			{Label: "Môn học", URL: "/teacher/courses"},
+			{Label: name, URL: ""},
+		}
+		csrf := security.GetTokenFromContext(r.Context())
+		nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/courses", "Quản lý môn học", csrf)
 		h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "course_form.html"), map[string]any{
 			"Title": "Chỉnh sửa môn học",
 			"IsNew": false,
@@ -211,7 +263,9 @@ func (h *Handler) HandleTeacherUpdateCourse(w http.ResponseWriter, r *http.Reque
 				"Description": desc,
 				"Status":      status,
 			},
-			"User": user,
+			"User":      user,
+			"Nav":       nav,
+			"ActiveNav": "courses",
 		})
 		return
 	}
@@ -223,7 +277,7 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 	if m, ok := data.(map[string]any); ok {
 		frontend.InjectCSRFToMap(r, m)
 	}
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := frontend.ParseFilesWithShared(tmplPath)
 	if err != nil {
 		http.Error(w, "Không tìm thấy giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

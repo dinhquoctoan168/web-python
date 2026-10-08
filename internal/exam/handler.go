@@ -2,7 +2,6 @@ package exam
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"web_python/internal/class"
 	"web_python/internal/exercise"
 	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 type Handler struct {
@@ -42,10 +42,18 @@ func (h *Handler) HandleTeacherListExams(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Kỳ thi & Kiểm tra", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "exams", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "exam_list.html"), map[string]any{
-		"Title": "Quản lý Bài thi & Kiểm tra",
-		"Exams": exams,
-		"User":  user,
+		"Title":     "Quản lý Bài thi & Kiểm tra",
+		"Exams":     exams,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "exams",
 	})
 }
 
@@ -69,11 +77,20 @@ func (h *Handler) HandleTeacherNewExamForm(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Kỳ thi & Kiểm tra", URL: "/teacher/exams"},
+		{Label: "Tạo đề thi mới", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "exams", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "exam_form.html"), map[string]any{
 		"Title":     "Tạo đề thi mới",
 		"Classes":   classes,
 		"Exercises": exercises,
 		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "exams",
 	})
 }
 
@@ -182,10 +199,18 @@ func (h *Handler) HandleStudentMyExams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Kỳ thi & Kiểm tra", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "exams", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "student", "exam_list.html"), map[string]any{
-		"Title": "Bài kiểm tra & Thi cử",
-		"Exams": exams,
-		"User":  user,
+		"Title":     "Bài kiểm tra & Thi cử",
+		"Exams":     exams,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "exams",
 	})
 }
 
@@ -356,11 +381,20 @@ func (h *Handler) HandleTeacherExamMonitoring(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Kỳ thi & Kiểm tra", URL: "/teacher/exams"},
+		{Label: "Giám sát: " + exam.Title, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "exams", breadcrumbs, "", "", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "exam_monitoring.html"), map[string]any{
 		"Title":     "Giám sát phòng thi: " + exam.Title,
 		"Exam":      exam,
 		"Summaries": summaries,
 		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "exams",
 	})
 }
 
@@ -368,8 +402,7 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 	if m, ok := data.(map[string]any); ok {
 		frontend.InjectCSRFToMap(r, m)
 	}
-	resolvedPath := frontend.ResolveTemplatePath(tmplPath)
-	tmpl, err := template.ParseFiles(resolvedPath)
+	tmpl, err := frontend.ParseFilesWithShared(tmplPath)
 	if err != nil {
 		http.Error(w, "Lỗi nạp giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

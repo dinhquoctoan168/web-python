@@ -2,6 +2,9 @@ package teacher
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"web_python/internal/auth"
@@ -144,3 +147,82 @@ func TestTeacherDashboardAndClassAnalytics(t *testing.T) {
 		t.Errorf("Kỳ vọng tìm thấy chẩn đoán cho bài tập 10")
 	}
 }
+
+func TestTeacherDashboardTemplateRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	svc := NewService(repo, db)
+	handler := NewHandler(svc)
+
+	teacherUser := &auth.User{
+		ID:       2,
+		Username: "teacher",
+		FullName: "Thầy Giáo Mẫu",
+		Role:     "teacher",
+	}
+
+	req := httptest.NewRequest("GET", "/teacher", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), teacherUser))
+	rec := httptest.NewRecorder()
+
+	handler.HandleTeacherDashboard(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Teacher") {
+		t.Errorf("Expected body to contain 'Teacher'")
+	}
+	if !strings.Contains(body, "Thầy Giáo Mẫu") {
+		t.Errorf("Expected body to contain user name 'Thầy Giáo Mẫu'")
+	}
+	if !strings.Contains(body, "appNavLinks") {
+		t.Errorf("Expected body to contain appNavLinks from shared nav template")
+	}
+}
+
+func TestTeacherAnalyticsAndStudentDetailTemplatesRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	svc := NewService(repo, db)
+	handler := NewHandler(svc)
+
+	teacherUser := &auth.User{
+		ID:       2,
+		Username: "teacher",
+		FullName: "Thầy Giáo Mẫu",
+		Role:     "teacher",
+	}
+
+	// 1. Phân tích lớp học
+	reqAnalytics := httptest.NewRequest("GET", "/teacher/class/analytics?class_id=1", nil)
+	reqAnalytics = reqAnalytics.WithContext(auth.WithUser(reqAnalytics.Context(), teacherUser))
+	recAnalytics := httptest.NewRecorder()
+	handler.HandleClassAnalytics(recAnalytics, reqAnalytics)
+	if recAnalytics.Code != http.StatusOK {
+		t.Fatalf("HandleClassAnalytics kỳ vọng 200 OK, nhận %d: %s", recAnalytics.Code, recAnalytics.Body.String())
+	}
+	if !strings.Contains(recAnalytics.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+
+	// 2. Chi tiết học viên
+	reqStudent := httptest.NewRequest("GET", "/teacher/student/detail?student_id=3&class_id=1", nil)
+	reqStudent = reqStudent.WithContext(auth.WithUser(reqStudent.Context(), teacherUser))
+	recStudent := httptest.NewRecorder()
+	handler.HandleStudentDetail(recStudent, reqStudent)
+	if recStudent.Code != http.StatusOK {
+		t.Fatalf("HandleStudentDetail kỳ vọng 200 OK, nhận %d: %s", recStudent.Code, recStudent.Body.String())
+	}
+	if !strings.Contains(recStudent.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+}
+
+

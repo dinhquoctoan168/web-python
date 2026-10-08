@@ -1,6 +1,9 @@
 package teacher
 
-import "web_python/internal/auth"
+import (
+	"web_python/internal/auth"
+	"web_python/internal/frontend"
+)
 
 // TeacherDashboardSummary chứa các chỉ số tổng quan ở trang chủ giáo viên
 type TeacherDashboardSummary struct {
@@ -80,6 +83,7 @@ type StudentDetailData struct {
 	Title       string                      `json:"title"`
 	User        *auth.User                  `json:"user"`
 	CSRFToken   string                      `json:"csrf_token"`
+	Nav         frontend.NavigationData     `json:"nav"`
 	ClassID     int                         `json:"class_id"`
 	ClassName   string                      `json:"class_name"`
 	Student     *auth.User                  `json:"student"`
@@ -91,6 +95,7 @@ type TeacherDashboardPageData struct {
 	Title     string
 	User      *auth.User
 	CSRFToken string
+	Nav       frontend.NavigationData
 	Summary   TeacherDashboardSummary
 	Classes   []ClassSummaryItem
 }

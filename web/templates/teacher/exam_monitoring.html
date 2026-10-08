@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/nav.css">
     <link rel="stylesheet" href="/static/css/class.css">
     <style>
         .badge-safe { background-color: rgba(78, 201, 176, 0.15); color: #4ec9b0; border: 1px solid #4ec9b0; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 12px; }
@@ -26,36 +27,10 @@
     </style>
 </head>
 <body>
-    <header class="navbar">
-        <a href="/courses" class="nav-brand">
-            <span>&#128187;</span>
-            <span>Web Python <strong>Platform</strong></span>
-        </a>
-        <nav class="nav-links">
-            <a href="/courses">Môn học</a>
-            <a href="/teacher/courses">Quản lý Môn</a>
-            <a href="/teacher/classes">Quản lý Lớp</a>
-            <a href="/teacher/assignments">Giao bài tập</a>
-            <a href="/teacher/exams" class="active">Kỳ thi & Kiểm tra</a>
-            <a href="/teacher/submissions">Lịch sử nộp bài</a>
-            <a href="/ide">Luyện tập (IDE)</a>
-        </nav>
-        <div class="nav-user">
-            {{ if .User }}
-                <span>{{ .User.FullName }}</span>
-                <span class="badge-role">{{ .User.Role }}</span>
-                <form action="/logout" method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
-                </form>
-            {{ end }}
-        </div>
-    </header>
+    {{ template "app_nav" .Nav }}
 
     <main class="container">
-        <div style="margin-bottom: 20px;">
-            <a href="/teacher/exams" style="color: var(--accent-blue, #61afef); text-decoration: none; font-size: 14px;">&larr; Quay lại danh sách bài thi</a>
-        </div>
+        {{ template "breadcrumb" .Nav.Breadcrumbs }}
 
         <div class="page-header">
             <div>
@@ -152,5 +127,6 @@
             </table>
         </div>
     </main>
+    <script src="/static/js/nav.js"></script>
 </body>
 </html>

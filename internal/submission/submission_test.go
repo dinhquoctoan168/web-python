@@ -2,8 +2,13 @@ package submission
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
+	"web_python/internal/auth"
 	"web_python/internal/database"
 	"web_python/internal/exercise"
 	"web_python/internal/judge"
@@ -142,4 +147,50 @@ func TestEditScoreWithAudit(t *testing.T) {
 		t.Errorf("Kỳ vọng điểm được sửa thành 85.0, nhận %f", updated.Score)
 	}
 }
+
+func TestSubmissionTemplatesRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	handler := NewHandler(svc)
+
+	sub, err := svc.SubmitCode(1, 1, "def test(): return 10", 50.0, 1, 2)
+	if err != nil {
+		t.Fatalf("SubmitCode thất bại: %v", err)
+	}
+
+	teacherUser := &auth.User{
+		ID:       2,
+		Username: "teacher1",
+		FullName: "Thay Giao",
+		Role:     auth.RoleTeacher,
+	}
+
+	// 1. Giảng viên xem danh sách bài nộp
+	reqList := httptest.NewRequest("GET", "/teacher/submissions", nil)
+	reqList = reqList.WithContext(auth.WithUser(reqList.Context(), teacherUser))
+	recList := httptest.NewRecorder()
+	handler.HandleTeacherSubmissions(recList, reqList)
+	if recList.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherSubmissions kỳ vọng 200 OK, nhận %d: %s", recList.Code, recList.Body.String())
+	}
+	if !strings.Contains(recList.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+
+	// 2. Giảng viên xem chi tiết một bài nộp
+	reqDetail := httptest.NewRequest("GET", "/teacher/submission/view?id="+strconv.Itoa(sub.ID), nil)
+	reqDetail = reqDetail.WithContext(auth.WithUser(reqDetail.Context(), teacherUser))
+	recDetail := httptest.NewRecorder()
+	handler.HandleTeacherSubmissionView(recDetail, reqDetail)
+	if recDetail.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherSubmissionView kỳ vọng 200 OK, nhận %d: %s", recDetail.Code, recDetail.Body.String())
+	}
+	if !strings.Contains(recDetail.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+}
+
 

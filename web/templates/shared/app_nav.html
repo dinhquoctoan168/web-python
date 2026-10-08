@@ -1,0 +1,73 @@
+{{ define "app_nav" }}
+<header class="navbar {{ if or (eq .Role "teacher") (eq .Role "admin") }}teacher{{ end }}">
+    <div class="nav-left">
+        <a href="{{ .HomeURL }}" class="nav-brand {{ if or (eq .Role "teacher") (eq .Role "admin") }}teacher{{ end }}">
+            <span class="brand-icon">{{ if or (eq .Role "teacher") (eq .Role "admin") }}&#127891;{{ else }}&#128187;{{ end }}</span>
+            <span>{{ if or (eq .Role "teacher") (eq .Role "admin") }}Teacher <strong>Platform</strong>{{ else }}Web Python <strong>Platform</strong>{{ end }}</span>
+        </a>
+    </div>
+
+    <button class="nav-toggle-btn" aria-label="Chuyển đổi menu" aria-expanded="false" aria-controls="appNavLinks" onclick="toggleNavMenu(this)">
+        <span class="nav-toggle-icon">&#9776;</span>
+    </button>
+
+    <nav class="nav-links" id="appNavLinks">
+        {{ range .Items }}
+        <a href="{{ .URL }}" class="{{ if .Active }}active{{ end }}" {{ if .Active }}aria-current="page"{{ end }}>{{ .Label }}</a>
+        {{ end }}
+    </nav>
+
+    <div class="nav-user">
+        {{ if .UserName }}
+            <span class="user-name">{{ .UserName }}</span>
+            <span class="badge-role {{ if or (eq .Role "teacher") (eq .Role "admin") }}teacher{{ end }}">{{ .Role }}</span>
+            <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+                <button type="submit" class="btn btn-secondary btn-logout" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
+            </form>
+        {{ else }}
+            <a href="/login" class="btn btn-primary" style="padding: 4px 12px; font-size: 13px;">Đăng nhập</a>
+        {{ end }}
+    </div>
+</header>
+{{ end }}
+
+{{ define "app_nav_compact" }}
+<div class="nav-compact-bar">
+    <div class="nav-compact-left">
+        {{ if .BackURL }}
+        <a href="{{ .BackURL }}" class="btn-nav-back" title="{{ if .BackLabel }}{{ .BackLabel }}{{ else }}Quay lại{{ end }}">
+            <span class="back-arrow">&#8592;</span>
+            <span class="back-text">{{ if .BackLabel }}{{ .BackLabel }}{{ else }}Quay lại{{ end }}</span>
+        </a>
+        {{ end }}
+        <a href="{{ .HomeURL }}" class="nav-compact-home" title="Về trang chủ ({{ .HomeLabel }})">
+            <span class="home-icon">{{ if or (eq .Role "teacher") (eq .Role "admin") }}&#127891;{{ else }}&#128187;{{ end }}</span>
+            <span class="home-title">{{ if or (eq .Role "teacher") (eq .Role "admin") }}Teacher{{ else }}Trang chủ{{ end }}</span>
+        </a>
+    </div>
+
+    <div class="nav-compact-menu">
+        <div class="compact-dropdown">
+            <button class="btn-compact-dropdown" onclick="toggleCompactMenu(event)" aria-haspopup="true" aria-expanded="false" title="Menu điều hướng">
+                <span>Menu</span> <span class="dropdown-caret">&#9662;</span>
+            </button>
+            <div class="compact-dropdown-content" id="compactMenuDropdown">
+                {{ range .Items }}
+                <a href="{{ .URL }}" class="{{ if .Active }}active{{ end }}" {{ if .Active }}aria-current="page"{{ end }}>{{ .Label }}</a>
+                {{ end }}
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-compact-user">
+        {{ if .UserName }}
+            <span class="compact-user-name" title="{{ .UserName }}">{{ .UserName }}</span>
+            <form action="/logout" method="POST" style="display:inline; margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+                <button type="submit" class="btn-compact-logout" title="Đăng xuất">&#10140;</button>
+            </form>
+        {{ end }}
+    </div>
+</div>
+{{ end }}

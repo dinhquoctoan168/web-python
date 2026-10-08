@@ -4,36 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ .Title }} - Web Python Platform</title>
+    <link rel="stylesheet" href="/static/css/nav.css">
     <link rel="stylesheet" href="/static/css/course.css">
 </head>
 <body>
-    <header class="navbar">
-        <a href="/courses" class="nav-brand">
-            <span>&#128187;</span>
-            <span>Web Python <strong>Platform</strong></span>
-        </a>
-        <nav class="nav-links">
-            <a href="/courses" class="active">Môn học</a>
-            <a href="/ide">Luyện tập (IDE)</a>
-            {{ if .User }}
-                {{ if or (eq .User.Role "teacher") (eq .User.Role "admin") }}
-                <a href="/teacher/courses">Khu vực Giảng viên</a>
-                {{ end }}
-            {{ end }}
-        </nav>
-        <div class="nav-user">
-            {{ if .User }}
-                <span>{{ .User.FullName }}</span>
-                <span class="badge-role">{{ .User.Role }}</span>
-                <form action="/logout" method="POST" style="display:inline;">
-                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Đăng xuất</button>
-                </form>
-            {{ else }}
-                <a href="/login" class="btn btn-primary" style="padding: 4px 10px;">Đăng nhập</a>
-            {{ end }}
-        </div>
-    </header>
+    {{ template "app_nav" .Nav }}
 
     <main class="container">
         <div class="page-header">

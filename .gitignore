@@ -4,3 +4,4 @@ data/Database/*.db
 data/Database/*.db-journal
 .env.local
 accounts.txt
+cmd/tools/

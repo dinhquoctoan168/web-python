@@ -2,7 +2,14 @@ package class
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+
+	"web_python/internal/auth"
+	"web_python/internal/course"
 
 	_ "modernc.org/sqlite"
 )
@@ -135,3 +142,75 @@ func TestClassAndEnrollment(t *testing.T) {
 		t.Errorf("Kỳ vọng 1 sinh viên sau khi xoá, nhận: %d", len(updatedStudents))
 	}
 }
+
+func TestClassTemplatesRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	_, _ = db.Exec(`INSERT INTO users (id, username, password_hash, full_name, role) VALUES (1, 'teacher1', 'hash', 'Thầy Giáo', 'teacher')`)
+	_, _ = db.Exec(`INSERT INTO users (id, username, password_hash, full_name, role) VALUES (2, 'student1', 'hash', 'Sinh Viên 1', 'student')`)
+	_, _ = db.Exec(`INSERT INTO courses (id, code, name, description, created_by) VALUES (1, 'PY101', 'Python cơ bản', 'Mô tả', 1)`)
+
+	repo := NewRepository(db)
+	service := NewService(repo)
+	courseRepo := course.NewRepository(db)
+	courseService := course.NewService(courseRepo)
+	handler := NewHandler(service, courseService)
+
+	cl, err := service.CreateClass(1, "23CNTT1", "HK1", "2024-2025", 1)
+	if err != nil {
+		t.Fatalf("CreateClass lỗi: %v", err)
+	}
+	_ = service.EnrollStudent(cl.ID, 2)
+
+	teacherUser := &auth.User{
+		ID:       1,
+		Username: "teacher1",
+		FullName: "Thầy Giáo",
+		Role:     auth.RoleTeacher,
+	}
+
+	studentUser := &auth.User{
+		ID:       2,
+		Username: "student1",
+		FullName: "Sinh Viên 1",
+		Role:     auth.RoleStudent,
+	}
+
+	// 1. Giảng viên xem danh sách lớp học
+	reqTeacher := httptest.NewRequest("GET", "/teacher/classes", nil)
+	reqTeacher = reqTeacher.WithContext(auth.WithUser(reqTeacher.Context(), teacherUser))
+	recTeacher := httptest.NewRecorder()
+	handler.HandleTeacherListClasses(recTeacher, reqTeacher)
+	if recTeacher.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherListClasses kỳ vọng 200 OK, nhận %d: %s", recTeacher.Code, recTeacher.Body.String())
+	}
+	if !strings.Contains(recTeacher.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng trang teacher classes chứa breadcrumb")
+	}
+
+	// 2. Giảng viên xem chi tiết lớp học
+	reqDetail := httptest.NewRequest("GET", "/teacher/class?id="+strconv.Itoa(cl.ID), nil)
+	reqDetail = reqDetail.WithContext(auth.WithUser(reqDetail.Context(), teacherUser))
+	recDetail := httptest.NewRecorder()
+	handler.HandleTeacherClassDetail(recDetail, reqDetail)
+	if recDetail.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherClassDetail kỳ vọng 200 OK, nhận %d: %s", recDetail.Code, recDetail.Body.String())
+	}
+	if !strings.Contains(recDetail.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng trang class detail chứa breadcrumb")
+	}
+
+	// 3. Sinh viên xem danh sách lớp học của mình
+	reqStudent := httptest.NewRequest("GET", "/my-classes", nil)
+	reqStudent = reqStudent.WithContext(auth.WithUser(reqStudent.Context(), studentUser))
+	recStudent := httptest.NewRecorder()
+	handler.HandleStudentMyClasses(recStudent, reqStudent)
+	if recStudent.Code != http.StatusOK {
+		t.Fatalf("HandleStudentMyClasses kỳ vọng 200 OK, nhận %d: %s", recStudent.Code, recStudent.Body.String())
+	}
+	if !strings.Contains(recStudent.Body.String(), "appNavLinks") {
+		t.Errorf("Kỳ vọng trang my-classes chứa appNavLinks từ shared app_nav")
+	}
+}
+

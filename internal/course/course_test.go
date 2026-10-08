@@ -186,3 +186,57 @@ func TestTeacherCreateCourse_And_StudentCannotCreate(t *testing.T) {
 		t.Errorf("Kỳ vọng CreatedBy = 10, nhận %d", cCreated.CreatedBy)
 	}
 }
+
+func TestCourseTemplatesRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	service := NewService(repo)
+	handler := NewHandler(service)
+
+	_, _ = service.CreateCourse("PY101", "Python cơ bản", "Học phần Python", 1)
+
+	teacherUser := &auth.User{
+		ID:       1,
+		Username: "teacher1",
+		FullName: "Thầy Giáo",
+		Role:     auth.RoleTeacher,
+	}
+
+	// 1. Sinh viên xem danh sách môn học
+	req := httptest.NewRequest("GET", "/courses", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), teacherUser))
+	rec := httptest.NewRecorder()
+	handler.HandleListCourses(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HandleListCourses kỳ vọng 200 OK, nhận %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "appNavLinks") {
+		t.Errorf("Kỳ vọng body chứa appNavLinks từ shared app_nav")
+	}
+
+	// 2. Giảng viên xem quản lý môn học
+	reqTeacher := httptest.NewRequest("GET", "/teacher/courses", nil)
+	reqTeacher = reqTeacher.WithContext(auth.WithUser(reqTeacher.Context(), teacherUser))
+	recTeacher := httptest.NewRecorder()
+	handler.HandleTeacherListCourses(recTeacher, reqTeacher)
+	if recTeacher.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherListCourses kỳ vọng 200 OK, nhận %d: %s", recTeacher.Code, recTeacher.Body.String())
+	}
+	if !strings.Contains(recTeacher.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+
+	// 3. Giảng viên mở form tạo mới
+	reqNew := httptest.NewRequest("GET", "/teacher/course/new", nil)
+	reqNew = reqNew.WithContext(auth.WithUser(reqNew.Context(), teacherUser))
+	recNew := httptest.NewRecorder()
+	handler.HandleTeacherNewCourseForm(recNew, reqNew)
+	if recNew.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherNewCourseForm kỳ vọng 200 OK, nhận %d: %s", recNew.Code, recNew.Body.String())
+	}
+	if !strings.Contains(recNew.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+}

@@ -2,7 +2,12 @@ package lesson
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"web_python/internal/auth"
 
 	_ "modernc.org/sqlite"
 )
@@ -139,4 +144,80 @@ func TestLessonAndCurriculum(t *testing.T) {
 	if vDetail.VisualizationType != "binary_search" {
 		t.Errorf("Mong đợi VisualizationType 'binary_search', nhận: '%s'", vDetail.VisualizationType)
 	}
+}
+
+func TestLessonTemplatesRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	_, _ = db.Exec(`INSERT INTO courses (id, code, name) VALUES (1, 'PY101', 'Python cơ bản')`)
+
+	repo := NewRepository(db)
+	service := NewService(repo)
+	handler := NewHandler(service)
+
+	ch, err := service.CreateChapter(1, "Chương 1", "Mô tả", 1)
+	if err != nil {
+		t.Fatalf("Lỗi tạo chapter: %v", err)
+	}
+	l, err := service.CreateLesson(ch.ID, "Bài 1", "<p>Nội dung</p>", 1, true, "")
+	if err != nil {
+		t.Fatalf("Lỗi tạo lesson: %v", err)
+	}
+
+	teacherUser := &auth.User{
+		ID:       1,
+		Username: "teacher1",
+		FullName: "Thầy Giáo",
+		Role:     auth.RoleTeacher,
+	}
+
+	// 1. Sinh viên / Người dùng xem chi tiết bài học
+	reqLesson := httptest.NewRequest("GET", "/lesson?id=1", nil)
+	reqLesson = reqLesson.WithContext(auth.WithUser(reqLesson.Context(), teacherUser))
+	recLesson := httptest.NewRecorder()
+	handler.HandleStudentLesson(recLesson, reqLesson)
+	if recLesson.Code != http.StatusOK {
+		t.Fatalf("HandleStudentLesson kỳ vọng 200 OK, nhận %d: %s", recLesson.Code, recLesson.Body.String())
+	}
+	if !strings.Contains(recLesson.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng trang bài học chứa breadcrumb")
+	}
+
+	// 2. Giảng viên xem quản lý chương trình đào tạo
+	reqCurr := httptest.NewRequest("GET", "/teacher/curriculum?course_id=1", nil)
+	reqCurr = reqCurr.WithContext(auth.WithUser(reqCurr.Context(), teacherUser))
+	recCurr := httptest.NewRecorder()
+	handler.HandleTeacherCurriculum(recCurr, reqCurr)
+	if recCurr.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherCurriculum kỳ vọng 200 OK, nhận %d: %s", recCurr.Code, recCurr.Body.String())
+	}
+	if !strings.Contains(recCurr.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng trang curriculum chứa breadcrumb")
+	}
+
+	// 3. Giảng viên mở form tạo bài học mới
+	reqNew := httptest.NewRequest("GET", "/teacher/lesson/new?chapter_id=1", nil)
+	reqNew = reqNew.WithContext(auth.WithUser(reqNew.Context(), teacherUser))
+	recNew := httptest.NewRecorder()
+	handler.HandleTeacherNewLessonForm(recNew, reqNew)
+	if recNew.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherNewLessonForm kỳ vọng 200 OK, nhận %d: %s", recNew.Code, recNew.Body.String())
+	}
+	if !strings.Contains(recNew.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng form bài học chứa breadcrumb")
+	}
+
+	// 4. Giảng viên mở form chỉnh sửa bài học
+	reqEdit := httptest.NewRequest("GET", "/teacher/lesson/edit?id=1", nil)
+	reqEdit = reqEdit.WithContext(auth.WithUser(reqEdit.Context(), teacherUser))
+	recEdit := httptest.NewRecorder()
+	handler.HandleTeacherEditLessonForm(recEdit, reqEdit)
+	if recEdit.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherEditLessonForm kỳ vọng 200 OK, nhận %d: %s", recEdit.Code, recEdit.Body.String())
+	}
+	if !strings.Contains(recEdit.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng form chỉnh sửa bài học chứa breadcrumb")
+	}
+	_ = l
 }

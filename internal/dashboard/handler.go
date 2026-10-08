@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"path/filepath"
 
@@ -47,8 +46,9 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 		frontend.InjectCSRFToMap(r, m)
 	} else if d, ok := data.(*StudentDashboardData); ok {
 		d.CSRFToken = security.GetTokenFromContext(r.Context())
+		d.Nav = frontend.BuildNavigationData(d.User, "dashboard", nil, "", "", d.CSRFToken)
 	}
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := frontend.ParseFilesWithShared(tmplPath)
 	if err != nil {
 		http.Error(w, "Lỗi tải giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

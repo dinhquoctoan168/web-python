@@ -2,11 +2,11 @@ package submission
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"strconv"
 
 	"web_python/internal/auth"
+	"web_python/internal/frontend"
 	"web_python/internal/security"
 )
 
@@ -138,6 +138,7 @@ func (h *Handler) HandleGetMySubmissions(w http.ResponseWriter, r *http.Request)
 type TeacherSubmissionsPageData struct {
 	User        *auth.User
 	CSRFToken   string
+	Nav         frontend.NavigationData
 	Submissions []Submission
 	History     *StudentHistoryView
 	Submission  *Submission
@@ -171,14 +172,25 @@ func (h *Handler) HandleTeacherSubmissions(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	tmpl, err := template.ParseFiles("web/templates/teacher/submissions.html")
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lịch sử nộp bài", URL: ""},
+	}
+	if data.History != nil {
+		breadcrumbs = []frontend.Breadcrumb{
+			{Label: "Lịch sử nộp bài", URL: "/teacher/submissions"},
+			{Label: data.History.StudentName + " (" + data.History.ExerciseTitle + ")", URL: ""},
+		}
+	}
+	data.Nav = frontend.BuildNavigationData(user, "submissions", breadcrumbs, "", "", data.CSRFToken)
+
+	tmpl, err := frontend.ParseFilesWithShared("web/templates/teacher/submissions.html")
 	if err != nil {
 		http.Error(w, "Lỗi nạp template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl.Execute(w, data)
+	_ = tmpl.Execute(w, data)
 }
 
 // HandleTeacherSubmissionView xử lý GET /teacher/submission/view
@@ -197,18 +209,24 @@ func (h *Handler) HandleTeacherSubmissionView(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	csrf := security.GetTokenFromContext(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lịch sử nộp bài", URL: "/teacher/submissions"},
+		{Label: "Chi tiết bài nộp #" + strconv.Itoa(sub.ID), URL: ""},
+	}
 	data := TeacherSubmissionsPageData{
 		User:       user,
-		CSRFToken:  security.GetTokenFromContext(r.Context()),
+		CSRFToken:  csrf,
 		Submission: sub,
+		Nav:        frontend.BuildNavigationData(user, "submissions", breadcrumbs, "/teacher/submissions", "Lịch sử nộp bài", csrf),
 	}
 
-	tmpl, err := template.ParseFiles("web/templates/teacher/submissions.html")
+	tmpl, err := frontend.ParseFilesWithShared("web/templates/teacher/submissions.html")
 	if err != nil {
 		http.Error(w, "Lỗi nạp template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	tmpl.Execute(w, data)
+	_ = tmpl.Execute(w, data)
 }

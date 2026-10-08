@@ -2,6 +2,9 @@ package dashboard
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"web_python/internal/auth"
@@ -117,3 +120,41 @@ func TestGetStudentDashboardData(t *testing.T) {
 		t.Errorf("Kỳ vọng lỗi khi user nil")
 	}
 }
+
+func TestStudentDashboardTemplateRender(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	handler := NewHandler(svc)
+
+	studentUser := &auth.User{
+		ID:       3,
+		Username: "student",
+		FullName: "Sinh Viên Mẫu",
+		Role:     "student",
+	}
+
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	req = req.WithContext(auth.WithUser(req.Context(), studentUser))
+	rec := httptest.NewRecorder()
+
+	handler.HandleStudentDashboard(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "Web Python") {
+		t.Errorf("Expected body to contain 'Web Python'")
+	}
+	if !strings.Contains(body, "Sinh Viên Mẫu") {
+		t.Errorf("Expected body to contain user name 'Sinh Viên Mẫu'")
+	}
+	if !strings.Contains(body, "appNavLinks") {
+		t.Errorf("Expected body to contain appNavLinks from shared nav template")
+	}
+}
+

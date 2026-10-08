@@ -8,41 +8,12 @@
     <link rel="stylesheet" href="/static/css/teacher.css">
 </head>
 <body>
-    <header class="navbar teacher">
-        <a href="/teacher" class="nav-brand teacher">
-            <span class="brand-icon">&#127891;</span>
-            <span>Teacher <strong>Platform</strong></span>
-        </a>
-        <nav class="nav-links">
-            <a href="/teacher">&#128202; Dashboard</a>
-            <a href="/teacher/courses">&#128218; Môn học</a>
-            <a href="/teacher/classes">&#127891; Lớp học</a>
-            <a href="/teacher/curriculum">&#128214; Nội dung</a>
-            <a href="/ide">&#128187; Ngân hàng bài tập</a>
-            <a href="/teacher/assignments">&#128221; Bài tập</a>
-            <a href="/teacher/exams">&#9201; Kiểm tra</a>
-            <a href="/teacher/classes" class="active">&#128101; Sinh viên</a>
-            <a href="/teacher/class/analytics?class_id={{ .ClassID }}">&#128200; Thống kê</a>
-        </nav>
-        <div class="nav-user">
-            {{ if .User }}
-                <span class="user-name">{{ .User.FullName }}</span>
-                <span class="badge-role teacher">{{ .User.Role }}</span>
-                <form action="/logout" method="POST" style="display:inline; margin: 0;">
-                    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-                    <button type="submit" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">Đăng xuất</button>
-                </form>
-            {{ end }}
-        </div>
-    </header>
+    {{ template "app_nav" .Nav }}
 
     <main class="container">
+        {{ template "breadcrumb" .Nav.Breadcrumbs }}
+
         <div class="page-header">
-            <div class="breadcrumb">
-                <a href="/teacher">&larr; Bảng điều khiển</a> /
-                <a href="/teacher/class/analytics?class_id={{ .ClassID }}">Lớp {{ .ClassName }}</a> /
-                <span>Nhật ký sinh viên</span>
-            </div>
             <h1 class="page-title">&#128100; {{ .Student.FullName }} (@{{ .Student.Username }})</h1>
             <p class="page-subtitle">Chẩn đoán hành vi học tập và phát hiện các bài tập sinh viên đang gặp khó khăn.</p>
         </div>

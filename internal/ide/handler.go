@@ -4,9 +4,11 @@ package ide
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -14,6 +16,7 @@ import (
 	"web_python/internal/auth"
 	"web_python/internal/course"
 	"web_python/internal/exercise"
+	"web_python/internal/frontend"
 	"web_python/internal/lesson"
 	"web_python/internal/logic"
 	"web_python/internal/security"
@@ -31,6 +34,8 @@ type PageData struct {
 	Topics          []logic.Topic
 	CurrentExercise *exercise.ClientExerciseDetail
 	Functions       []logic.FunctionItem
+	User            *auth.User
+	Nav             frontend.NavigationData
 }
 
 // Handler điều phối logic hiển thị cho giao diện IDE
@@ -213,9 +218,14 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 		title = "Web Python IDE - " + courseName
 	}
 
+	user := auth.GetUser(r.Context())
+	backURL, backLabel := ResolveIDEBackContext(r, user)
+	csrfToken := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "ide", nil, backURL, backLabel, csrfToken)
+
 	data := PageData{
 		Title:           title,
-		CSRFToken:       security.GetTokenFromContext(r.Context()),
+		CSRFToken:       csrfToken,
 		CourseCode:      courseCode,
 		CourseName:      courseName,
 		Mode:            mode,
@@ -223,9 +233,16 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 		Chapters:        chapters,
 		CurrentExercise: currentExercise,
 		Functions:       funcs,
+		User:            user,
+		Nav:             nav,
 	}
 
-	tmpl, err := template.ParseFiles("web/templates/base.html", "web/templates/ide.html")
+	baseFile := frontend.ResolveTemplatePath(filepath.Join("web", "templates", "base.html"))
+	ideFile := frontend.ResolveTemplatePath(filepath.Join("web", "templates", "ide.html"))
+	allFiles := []string{baseFile, ideFile}
+	allFiles = append(allFiles, frontend.GetSharedTemplatePaths()...)
+
+	tmpl, err := template.ParseFiles(allFiles...)
 	if err != nil {
 		log.Printf("Lỗi parse template: %v", err)
 		http.Error(w, "Lỗi hiển thị giao diện", http.StatusInternalServerError)
@@ -233,9 +250,64 @@ func (h *Handler) HandleIDE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
+	if err := tmpl.ExecuteTemplate(w, filepath.Base(baseFile), data); err != nil {
 		log.Printf("Lỗi execute template: %v", err)
 	}
+}
+
+// ResolveIDEBackContext xác định BackURL và BackLabel theo tham số query và vai trò người dùng
+func ResolveIDEBackContext(r *http.Request, user *auth.User) (string, string) {
+	isTeacher := user != nil && (user.Role == auth.RoleTeacher || user.Role == auth.RoleAdmin)
+
+	// 1. Ngữ cảnh làm bài tập (assignment)
+	assignmentIDStr := strings.TrimSpace(r.URL.Query().Get("assignment_id"))
+	if assignmentIDStr != "" {
+		if isTeacher {
+			return fmt.Sprintf("/teacher/assignment?id=%s", assignmentIDStr), "Quay lại Bài tập"
+		}
+		return fmt.Sprintf("/assignment?id=%s", assignmentIDStr), "Quay lại Bài tập"
+	}
+
+	// 2. Ngữ cảnh từ bài học lý thuyết
+	lessonIDStr := strings.TrimSpace(r.URL.Query().Get("lesson_id"))
+	if lessonIDStr != "" {
+		return fmt.Sprintf("/lesson?id=%s", lessonIDStr), "Quay lại Bài học"
+	}
+
+	// 3. Ngữ cảnh từ kỳ thi
+	examIDStr := strings.TrimSpace(r.URL.Query().Get("exam_id"))
+	if examIDStr != "" {
+		if isTeacher {
+			return fmt.Sprintf("/teacher/exam/monitoring?id=%s", examIDStr), "Quay lại Kỳ thi"
+		}
+		return "/my-exams", "Quay lại Kỳ thi"
+	}
+
+	// 4. Ngữ cảnh từ môn học cụ thể
+	courseIDStr := strings.TrimSpace(r.URL.Query().Get("course_id"))
+	if courseIDStr != "" {
+		if isTeacher {
+			return fmt.Sprintf("/teacher/curriculum?course_id=%s", courseIDStr), "Quay lại Chương trình"
+		}
+		return fmt.Sprintf("/course?id=%s", courseIDStr), "Quay lại Môn học"
+	}
+
+	courseCode := strings.TrimSpace(r.URL.Query().Get("course"))
+	if courseCode != "" {
+		if isTeacher {
+			return "/teacher/courses", "Quay lại Môn học"
+		}
+		return "/courses", "Quay lại Môn học"
+	}
+
+	// 5. Mặc định theo vai trò người dùng
+	if isTeacher {
+		return "/teacher", "Quay lại Bảng điều khiển"
+	}
+	if user != nil {
+		return "/dashboard", "Quay lại Trang chủ"
+	}
+	return "/courses", "Quay lại Môn học"
 }
 
 // HandleAPIFunctions trả về danh sách hàm tra cứu theo từ khoá

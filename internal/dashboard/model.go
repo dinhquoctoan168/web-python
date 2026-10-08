@@ -1,6 +1,9 @@
 package dashboard
 
-import "web_python/internal/auth"
+import (
+	"web_python/internal/auth"
+	"web_python/internal/frontend"
+)
 
 // CourseProgressItem chứa thông tin tiến độ học tập một môn học của học viên
 type CourseProgressItem struct {
@@ -38,6 +41,7 @@ type StudentDashboardData struct {
 	Title             string
 	User              *auth.User
 	CSRFToken         string
+	Nav               frontend.NavigationData
 	Courses           []CourseProgressItem
 	Upcoming          []UpcomingItem
 	RecentSubmissions []RecentSubmissionItem

@@ -2,13 +2,13 @@ package lesson
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"path/filepath"
 	"strconv"
 
 	"web_python/internal/auth"
 	"web_python/internal/frontend"
+	"web_python/internal/security"
 )
 
 // Handler xử lý các yêu cầu HTTP liên quan đến chương mục và bài học
@@ -39,11 +39,21 @@ func (h *Handler) HandleStudentLesson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/courses"},
+		{Label: lesson.CourseName, URL: "/course?id=" + strconv.Itoa(lesson.CourseID)},
+		{Label: lesson.Title, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/course?id="+strconv.Itoa(lesson.CourseID), lesson.CourseName, csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "course", "lesson.html"), map[string]any{
 		"Title":      lesson.Title + " - " + lesson.CourseName,
 		"Lesson":     lesson,
 		"Curriculum": curriculum,
 		"User":       user,
+		"Nav":        nav,
+		"ActiveNav":  "courses",
 	})
 }
 
@@ -93,10 +103,20 @@ func (h *Handler) HandleTeacherCurriculum(w http.ResponseWriter, r *http.Request
 	}
 
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/teacher/courses"},
+		{Label: curriculum.CourseName, URL: ""},
+		{Label: "Nội dung đào tạo", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/courses", "Quản lý môn học", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "curriculum.html"), map[string]any{
 		"Title":      "Quản lý Nội dung: " + curriculum.CourseName,
 		"Curriculum": curriculum,
 		"User":       user,
+		"Nav":        nav,
+		"ActiveNav":  "courses",
 	})
 }
 
@@ -141,11 +161,21 @@ func (h *Handler) HandleTeacherNewLessonForm(w http.ResponseWriter, r *http.Requ
 	}
 
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/teacher/courses"},
+		{Label: "Nội dung đào tạo", URL: "/teacher/curriculum?course_id=" + strconv.Itoa(chapter.CourseID)},
+		{Label: "Thêm bài học", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/curriculum?course_id="+strconv.Itoa(chapter.CourseID), "Quản lý nội dung", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "lesson_form.html"), map[string]any{
-		"Title":   "Thêm bài học mới",
-		"IsNew":   true,
-		"Chapter": chapter,
-		"User":    user,
+		"Title":     "Thêm bài học mới",
+		"IsNew":     true,
+		"Chapter":   chapter,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "courses",
 	})
 }
 
@@ -204,12 +234,22 @@ func (h *Handler) HandleTeacherEditLessonForm(w http.ResponseWriter, r *http.Req
 	}
 
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Môn học", URL: "/teacher/courses"},
+		{Label: "Nội dung đào tạo", URL: "/teacher/curriculum?course_id=" + strconv.Itoa(chapter.CourseID)},
+		{Label: lesson.Title, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "courses", breadcrumbs, "/teacher/curriculum?course_id="+strconv.Itoa(chapter.CourseID), "Quản lý nội dung", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "lesson_form.html"), map[string]any{
-		"Title":   "Chỉnh sửa bài học: " + lesson.Title,
-		"IsNew":   false,
-		"Lesson":  lesson,
-		"Chapter": chapter,
-		"User":    user,
+		"Title":     "Chỉnh sửa bài học: " + lesson.Title,
+		"IsNew":     false,
+		"Lesson":    lesson,
+		"Chapter":   chapter,
+		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "courses",
 	})
 }
 
@@ -256,7 +296,7 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 	if m, ok := data.(map[string]any); ok {
 		frontend.InjectCSRFToMap(r, m)
 	}
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := frontend.ParseFilesWithShared(tmplPath)
 	if err != nil {
 		http.Error(w, "Không tìm thấy giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

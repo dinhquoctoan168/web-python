@@ -2,7 +2,6 @@ package teacher
 
 import (
 	"encoding/json"
-	"html/template"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -64,9 +63,19 @@ func (h *Handler) HandleClassAnalytics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := auth.GetUser(r.Context())
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lớp học", URL: "/teacher/classes"},
+		{Label: data.ClassName, URL: "/teacher/class?id=" + strconv.Itoa(data.ClassID)},
+		{Label: "Phân tích lớp học", URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	nav := frontend.BuildNavigationData(user, "classes", breadcrumbs, "/teacher/class?id="+strconv.Itoa(data.ClassID), "Chi tiết lớp học", csrf)
+
 	pageData := map[string]any{
 		"Title":     "Phân tích lớp học: " + data.ClassName,
 		"User":      user,
+		"Nav":       nav,
+		"ActiveNav": "classes",
 		"Analytics": data,
 	}
 
@@ -95,6 +104,15 @@ func (h *Handler) HandleStudentDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	breadcrumbs := []frontend.Breadcrumb{
+		{Label: "Lớp học", URL: "/teacher/classes"},
+		{Label: "Lớp " + data.ClassName, URL: "/teacher/class/analytics?class_id=" + strconv.Itoa(data.ClassID)},
+		{Label: data.Student.FullName, URL: ""},
+	}
+	csrf := security.GetTokenFromContext(r.Context())
+	data.CSRFToken = csrf
+	data.Nav = frontend.BuildNavigationData(user, "classes", breadcrumbs, "/teacher/class/analytics?class_id="+strconv.Itoa(data.ClassID), "Phân tích lớp học", csrf)
+
 	h.renderTemplate(w, r, filepath.Join("web", "templates", "teacher", "student_detail.html"), data)
 }
 
@@ -103,10 +121,14 @@ func (h *Handler) renderTemplate(w http.ResponseWriter, r *http.Request, tmplPat
 		frontend.InjectCSRFToMap(r, m)
 	} else if d, ok := data.(*TeacherDashboardPageData); ok {
 		d.CSRFToken = security.GetTokenFromContext(r.Context())
+		d.Nav = frontend.BuildNavigationData(d.User, "dashboard", nil, "", "", d.CSRFToken)
 	} else if d, ok := data.(*StudentDetailData); ok {
 		d.CSRFToken = security.GetTokenFromContext(r.Context())
+		if d.Nav.Role == "" {
+			d.Nav = frontend.BuildNavigationData(d.User, "classes", nil, "", "", d.CSRFToken)
+		}
 	}
-	tmpl, err := template.ParseFiles(tmplPath)
+	tmpl, err := frontend.ParseFilesWithShared(tmplPath)
 	if err != nil {
 		http.Error(w, "Lỗi tải giao diện: "+err.Error(), http.StatusInternalServerError)
 		return

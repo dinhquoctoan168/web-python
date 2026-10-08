@@ -3,10 +3,15 @@ package exam
 import (
 	"database/sql"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"web_python/internal/auth"
+	"web_python/internal/class"
 	"web_python/internal/database"
 	"web_python/internal/exercise"
 	"web_python/internal/judge"
@@ -253,5 +258,90 @@ func TestExam_TimerCalculatedByServer(t *testing.T) {
 	// Kỳ vọng remaining trong khoảng 2380 - 2420 giây
 	if resumedSession.RemainingSeconds < 2380 || resumedSession.RemainingSeconds > 2420 {
 		t.Errorf("Thời gian RemainingSeconds tính toán sai: %d (kỳ vọng xấp xỉ 2400 giây)", resumedSession.RemainingSeconds)
+	}
+}
+
+func TestExamTemplatesRender(t *testing.T) {
+	db, svc := setupTestDB(t)
+	defer db.Close()
+
+	exRepo := exercise.NewRepository(db)
+	exSvc := exercise.NewService(exRepo)
+	classRepo := class.NewRepository(db)
+	classSvc := class.NewService(classRepo)
+
+	handler := NewHandler(svc, classSvc, exSvc)
+
+	teacherUser := &auth.User{
+		ID:       2,
+		Username: "teacher1",
+		FullName: "Thay Giao",
+		Role:     auth.RoleTeacher,
+	}
+
+	studentUser := &auth.User{
+		ID:       3,
+		Username: "student1",
+		FullName: "Sinh Vien",
+		Role:     auth.RoleStudent,
+	}
+
+	// Tạo bài thi mẫu
+	nowStr := time.Now().Add(-1 * time.Hour).Format("2006-01-02T15:04")
+	laterStr := time.Now().Add(2 * time.Hour).Format("2006-01-02T15:04")
+	exam, err := svc.CreateExam(2, 1, "Kiểm tra giữa kỳ", "Quy chế thi nghiêm túc", 60, nowStr, laterStr, []int{101, 102}, []float64{4.0, 6.0})
+	if err != nil {
+		t.Fatalf("CreateExam thất bại: %v", err)
+	}
+
+	// 1. Giảng viên xem danh sách bài thi
+	reqTList := httptest.NewRequest("GET", "/teacher/exams", nil)
+	reqTList = reqTList.WithContext(auth.WithUser(reqTList.Context(), teacherUser))
+	recTList := httptest.NewRecorder()
+	handler.HandleTeacherListExams(recTList, reqTList)
+	if recTList.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherListExams kỳ vọng 200 OK, nhận %d: %s", recTList.Code, recTList.Body.String())
+	}
+	if !strings.Contains(recTList.Body.String(), "appNavLinks") {
+		t.Errorf("Kỳ vọng body chứa appNavLinks")
+	}
+	if !strings.Contains(recTList.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+
+	// 2. Giảng viên mở form tạo bài thi mới
+	reqTForm := httptest.NewRequest("GET", "/teacher/exam/new", nil)
+	reqTForm = reqTForm.WithContext(auth.WithUser(reqTForm.Context(), teacherUser))
+	recTForm := httptest.NewRecorder()
+	handler.HandleTeacherNewExamForm(recTForm, reqTForm)
+	if recTForm.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherNewExamForm kỳ vọng 200 OK, nhận %d: %s", recTForm.Code, recTForm.Body.String())
+	}
+	if !strings.Contains(recTForm.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+
+	// 3. Giảng viên xem trang giám sát bài thi
+	reqTMon := httptest.NewRequest("GET", "/teacher/exam/monitoring?id="+strconv.Itoa(exam.ID), nil)
+	reqTMon = reqTMon.WithContext(auth.WithUser(reqTMon.Context(), teacherUser))
+	recTMon := httptest.NewRecorder()
+	handler.HandleTeacherExamMonitoring(recTMon, reqTMon)
+	if recTMon.Code != http.StatusOK {
+		t.Fatalf("HandleTeacherExamMonitoring kỳ vọng 200 OK, nhận %d: %s", recTMon.Code, recTMon.Body.String())
+	}
+	if !strings.Contains(recTMon.Body.String(), "breadcrumb") {
+		t.Errorf("Kỳ vọng body chứa breadcrumb")
+	}
+
+	// 4. Sinh viên xem danh sách bài thi
+	reqSList := httptest.NewRequest("GET", "/my-exams", nil)
+	reqSList = reqSList.WithContext(auth.WithUser(reqSList.Context(), studentUser))
+	recSList := httptest.NewRecorder()
+	handler.HandleStudentMyExams(recSList, reqSList)
+	if recSList.Code != http.StatusOK {
+		t.Fatalf("HandleStudentMyExams kỳ vọng 200 OK, nhận %d: %s", recSList.Code, recSList.Body.String())
+	}
+	if !strings.Contains(recSList.Body.String(), "appNavLinks") {
+		t.Errorf("Kỳ vọng body chứa appNavLinks")
 	}
 }
